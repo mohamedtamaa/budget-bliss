@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useBudgetStore } from '@/lib/budget-store';
 import { format } from 'date-fns';
 import {
@@ -6,16 +7,20 @@ import {
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, AreaChart, Area
+  PieChart, Pie, Cell
 } from 'recharts';
+import MonthFilter from '@/components/MonthFilter';
 
 const formatCurrency = (n: number) =>
   new Intl.NumberFormat('en-EG', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 
 export default function DashboardPage() {
   const { transactions, recurringItems, loans, monthlyBudgets, accounts } = useBudgetStore();
-  const currentMonth = format(new Date(), 'yyyy-MM');
-  const currentBudget = monthlyBudgets.find((b) => b.month === currentMonth);
+  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
+  const currentBudget = monthlyBudgets.find((b) => b.month === selectedMonth);
+
+  // Filter transactions by selected month
+  const monthTransactions = transactions.filter((t) => t.date.startsWith(selectedMonth));
 
   const totalIncome = recurringItems
     .filter((r) => r.type === 'income' && r.active && r.includedInTotal)
@@ -28,7 +33,11 @@ export default function DashboardPage() {
   const totalLoans = loans.filter((l) => l.active).reduce((s, l) => s + l.monthlyAmount, 0);
   const netBalance = totalIncome - totalExpenses - totalLoans;
 
-  const recentTransactions = [...transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
+  // Actual income/expenses from transactions this month
+  const actualIncome = monthTransactions.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const actualExpenses = monthTransactions.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+
+  const recentTransactions = [...monthTransactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
 
   const totalAccountBalance = accounts
     .filter((a) => !a.excludeFromTotal)
@@ -36,13 +45,13 @@ export default function DashboardPage() {
 
   const creditCards = accounts.filter((a) => a.type === 'credit_card');
 
-  // Chart data
-  const expenseCategories = recurringItems
-    .filter((r) => r.type === 'expense' || r.type === 'subscription')
-    .reduce((acc, r) => {
-      const existing = acc.find((a) => a.name === r.category);
-      if (existing) existing.value += r.amount;
-      else acc.push({ name: r.category, value: r.amount });
+  // Chart data from transactions
+  const expenseCategories = monthTransactions
+    .filter((t) => t.type === 'expense')
+    .reduce((acc, t) => {
+      const existing = acc.find((a) => a.name === t.category);
+      if (existing) existing.value += t.amount;
+      else acc.push({ name: t.category, value: t.amount });
       return acc;
     }, [] as { name: string; value: number }[]);
 
@@ -53,14 +62,19 @@ export default function DashboardPage() {
   const budgetProgress = Math.round((budgetItemsPaid / budgetItemsTotal) * 100);
 
   const incomeVsExpense = [
-    { name: 'Income', amount: totalIncome },
-    { name: 'Expenses', amount: totalExpenses },
+    { name: 'Income', amount: actualIncome || totalIncome },
+    { name: 'Expenses', amount: actualExpenses || totalExpenses },
     { name: 'Loans', amount: totalLoans },
-    { name: 'Net', amount: netBalance },
+    { name: 'Net', amount: (actualIncome || totalIncome) - (actualExpenses || totalExpenses) - totalLoans },
   ];
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Month Filter */}
+      <div className="flex justify-between items-center">
+        <MonthFilter value={selectedMonth} onChange={setSelectedMonth} />
+      </div>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon={TrendingUp} label="Total Income" value={formatCurrency(totalIncome)} color="text-success" bgColor="bg-success/10" />
@@ -86,7 +100,7 @@ export default function DashboardPage() {
             <div className="w-8 h-8 rounded-lg bg-warning/10 flex items-center justify-center">
               <Calendar size={16} className="text-warning" />
             </div>
-            <span className="text-sm text-muted-foreground">Budget Progress</span>
+            <span className="text-sm text-muted-foreground">Budget Progress ({selectedMonth})</span>
           </div>
           <p className="text-2xl font-bold">{budgetProgress}%</p>
           <div className="mt-2 h-2 bg-secondary rounded-full overflow-hidden">
@@ -135,33 +149,39 @@ export default function DashboardPage() {
         </div>
 
         <div className="glass-card p-5">
-          <h3 className="text-sm font-medium text-muted-foreground mb-4">Expense Breakdown</h3>
-          <ResponsiveContainer width="100%" height={250}>
-            <PieChart>
-              <Pie data={expenseCategories} cx="50%" cy="50%" outerRadius={90} innerRadius={55} dataKey="value" paddingAngle={3}>
-                {expenseCategories.map((_, i) => (
-                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+          <h3 className="text-sm font-medium text-muted-foreground mb-4">Expense Breakdown ({selectedMonth})</h3>
+          {expenseCategories.length > 0 ? (
+            <>
+              <ResponsiveContainer width="100%" height={250}>
+                <PieChart>
+                  <Pie data={expenseCategories} cx="50%" cy="50%" outerRadius={90} innerRadius={55} dataKey="value" paddingAngle={3}>
+                    {expenseCategories.map((_, i) => (
+                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ backgroundColor: 'hsl(222,41%,10%)', border: '1px solid hsl(215,28%,20%)', borderRadius: 8 }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="flex flex-wrap gap-3 mt-2 justify-center">
+                {expenseCategories.map((c, i) => (
+                  <div key={c.name} className="flex items-center gap-1.5 text-xs">
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                    <span className="text-muted-foreground capitalize">{c.name}</span>
+                  </div>
                 ))}
-              </Pie>
-              <Tooltip
-                contentStyle={{ backgroundColor: 'hsl(222,41%,10%)', border: '1px solid hsl(215,28%,20%)', borderRadius: 8 }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="flex flex-wrap gap-3 mt-2 justify-center">
-            {expenseCategories.map((c, i) => (
-              <div key={c.name} className="flex items-center gap-1.5 text-xs">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                <span className="text-muted-foreground capitalize">{c.name}</span>
               </div>
-            ))}
-          </div>
+            </>
+          ) : (
+            <p className="text-center text-muted-foreground py-8 text-sm">No expense transactions this month</p>
+          )}
         </div>
       </div>
 
       {/* Recent Transactions */}
       <div className="glass-card p-5">
-        <h3 className="text-sm font-medium text-muted-foreground mb-4">Recent Transactions</h3>
+        <h3 className="text-sm font-medium text-muted-foreground mb-4">Recent Transactions ({selectedMonth})</h3>
         <div className="space-y-3">
           {recentTransactions.map((t) => (
             <div key={t.id} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
@@ -179,6 +199,7 @@ export default function DashboardPage() {
               </span>
             </div>
           ))}
+          {recentTransactions.length === 0 && <p className="text-center text-muted-foreground py-4 text-sm">No transactions this month</p>}
         </div>
       </div>
 
