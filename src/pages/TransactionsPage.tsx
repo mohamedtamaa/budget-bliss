@@ -43,7 +43,7 @@ export default function TransactionsPage() {
 
   const openEdit = (t: Transaction) => {
     setEditing(t);
-    setForm({ ...t, amount: String(t.amount), isEssential: t.isEssential || false });
+    setForm({ ...t, amount: String(t.amount), isEssential: t.isEssential || false, notes: t.notes || '' });
     setDialogOpen(true);
   };
 
