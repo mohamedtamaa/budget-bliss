@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Transaction, RecurringItem, Loan, MonthlyBudget, Account, AccountGroup, MonthlyBudgetItem } from './types';
+import { Transaction, RecurringItem, Loan, MonthlyBudget, Account, AccountGroup, MonthlyBudgetItem, CategoryGroup } from './types';
 import { seedTransactions, seedRecurringItems, seedLoans, seedMonthlyBudgets, seedAccounts, seedAccountGroups } from './seed-data';
 import { format, addMonths, parse, isAfter, isBefore } from 'date-fns';
 
@@ -11,6 +11,7 @@ interface BudgetStore {
   monthlyBudgets: MonthlyBudget[];
   accounts: Account[];
   accountGroups: AccountGroup[];
+  categoryGroups: CategoryGroup[];
 
   addTransaction: (t: Omit<Transaction, 'id'>) => void;
   updateTransaction: (id: string, t: Partial<Transaction>) => void;
@@ -30,8 +31,13 @@ interface BudgetStore {
 
   addAccountGroup: (g: Omit<AccountGroup, 'id'>) => void;
 
+  addCategoryGroup: (g: Omit<CategoryGroup, 'id'>) => void;
+  updateCategoryGroup: (id: string, g: Partial<CategoryGroup>) => void;
+  deleteCategoryGroup: (id: string) => void;
+
   createNextMonthBudget: (currentMonth: string) => boolean;
   toggleBudgetItemPaid: (budgetId: string, itemId: string) => void;
+  toggleBudgetItemFinished: (budgetId: string, itemId: string) => void;
 }
 
 const uid = () => crypto.randomUUID();
@@ -45,6 +51,7 @@ export const useBudgetStore = create<BudgetStore>()(
       monthlyBudgets: seedMonthlyBudgets,
       accounts: seedAccounts,
       accountGroups: seedAccountGroups,
+      categoryGroups: [],
 
       addTransaction: (t) => set((s) => ({ transactions: [...s.transactions, { ...t, id: uid() }] })),
       updateTransaction: (id, t) => set((s) => ({ transactions: s.transactions.map((x) => (x.id === id ? { ...x, ...t } : x)) })),
@@ -64,6 +71,10 @@ export const useBudgetStore = create<BudgetStore>()(
 
       addAccountGroup: (g) => set((s) => ({ accountGroups: [...s.accountGroups, { ...g, id: uid() }] })),
 
+      addCategoryGroup: (g) => set((s) => ({ categoryGroups: [...s.categoryGroups, { ...g, id: uid() }] })),
+      updateCategoryGroup: (id, g) => set((s) => ({ categoryGroups: s.categoryGroups.map((x) => (x.id === id ? { ...x, ...g } : x)) })),
+      deleteCategoryGroup: (id) => set((s) => ({ categoryGroups: s.categoryGroups.filter((x) => x.id !== id) })),
+
       createNextMonthBudget: (currentMonth: string) => {
         const nextDate = addMonths(parse(currentMonth + '-01', 'yyyy-MM-dd', new Date()), 1);
         const nextMonth = format(nextDate, 'yyyy-MM');
@@ -73,8 +84,15 @@ export const useBudgetStore = create<BudgetStore>()(
         const nextMonthEnd = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 0);
         const items: MonthlyBudgetItem[] = [];
 
+        // Check which items were marked as "finished" in the current month's budget
+        const currentBudget = get().monthlyBudgets.find((b) => b.month === currentMonth);
+        const finishedSourceIds = new Set(
+          currentBudget?.items.filter((i) => i.finished).map((i) => i.sourceId).filter(Boolean) || []
+        );
+
         get().recurringItems.forEach((r) => {
           if (!r.active) return;
+          if (finishedSourceIds.has(r.id)) return; // skip finished items
           const start = new Date(r.startDate);
           if (isAfter(start, nextMonthEnd)) return;
           if (r.endDate && isBefore(new Date(r.endDate), nextDate)) return;
@@ -84,6 +102,8 @@ export const useBudgetStore = create<BudgetStore>()(
             sourceType: 'recurring',
             name: r.name,
             type: r.type,
+            category: r.category,
+            subcategory: r.subcategory,
             amount: r.amount,
             paid: false,
           });
@@ -91,6 +111,7 @@ export const useBudgetStore = create<BudgetStore>()(
 
         get().loans.forEach((l) => {
           if (!l.active) return;
+          if (finishedSourceIds.has(l.id)) return; // skip finished items
           const start = new Date(l.startDate);
           if (isAfter(start, nextMonthEnd)) return;
           if (l.endDate && isBefore(new Date(l.endDate), nextDate)) return;
@@ -122,6 +143,20 @@ export const useBudgetStore = create<BudgetStore>()(
                   ...b,
                   items: b.items.map((i) =>
                     i.id === itemId ? { ...i, paid: !i.paid, paidDate: !i.paid ? format(new Date(), 'yyyy-MM-dd') : undefined } : i
+                  ),
+                }
+              : b
+          ),
+        })),
+
+      toggleBudgetItemFinished: (budgetId, itemId) =>
+        set((s) => ({
+          monthlyBudgets: s.monthlyBudgets.map((b) =>
+            b.id === budgetId
+              ? {
+                  ...b,
+                  items: b.items.map((i) =>
+                    i.id === itemId ? { ...i, finished: !i.finished } : i
                   ),
                 }
               : b

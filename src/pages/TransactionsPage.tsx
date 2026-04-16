@@ -10,11 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import MonthFilter from '@/components/MonthFilter';
 
-const categories = ['housing', 'transport', 'food', 'utilities', 'subscriptions', 'personal', 'debt', 'salary', 'freelance', 'other'];
 const formatCurrency = (n: number) => new Intl.NumberFormat('en-EG', { minimumFractionDigits: 2 }).format(n);
 
 export default function TransactionsPage() {
-  const { transactions, accounts, addTransaction, updateTransaction, deleteTransaction } = useBudgetStore();
+  const { transactions, accounts, categoryGroups, addTransaction, updateTransaction, deleteTransaction } = useBudgetStore();
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
@@ -23,7 +22,8 @@ export default function TransactionsPage() {
   const [form, setForm] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
     type: 'expense' as 'income' | 'expense',
-    category: 'other',
+    category: '',
+    subcategory: '',
     description: '',
     amount: '',
     accountId: accounts[0]?.id || '',
@@ -32,10 +32,13 @@ export default function TransactionsPage() {
     isEssential: false,
   });
 
+  const allCategories = categoryGroups.filter((g) => g.type === form.type);
+  const selectedGroup = categoryGroups.find((g) => g.id === form.category);
+
   const filtered = transactions
     .filter((t) => t.date.startsWith(selectedMonth))
     .filter((t) => (typeFilter === 'all' || t.type === typeFilter))
-    .filter((t) => t.description.toLowerCase().includes(search.toLowerCase()) || t.category.toLowerCase().includes(search.toLowerCase()))
+    .filter((t) => (t.description || '').toLowerCase().includes(search.toLowerCase()) || t.category.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => b.date.localeCompare(a.date));
 
   const monthIncome = filtered.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0);
@@ -43,19 +46,19 @@ export default function TransactionsPage() {
 
   const openAdd = () => {
     setEditing(null);
-    setForm({ date: format(new Date(), 'yyyy-MM-dd'), type: 'expense', category: 'other', description: '', amount: '', accountId: accounts[0]?.id || '', notes: '', includedInTotal: true, isEssential: false });
+    setForm({ date: format(new Date(), 'yyyy-MM-dd'), type: 'expense', category: '', subcategory: '', description: '', amount: '', accountId: accounts[0]?.id || '', notes: '', includedInTotal: true, isEssential: false });
     setDialogOpen(true);
   };
 
   const openEdit = (t: Transaction) => {
     setEditing(t);
-    setForm({ ...t, amount: String(t.amount), isEssential: t.isEssential || false, notes: t.notes || '' });
+    setForm({ ...t, amount: String(t.amount), isEssential: t.isEssential || false, notes: t.notes || '', description: t.description || '', subcategory: t.subcategory || '' });
     setDialogOpen(true);
   };
 
   const save = () => {
-    if (!form.description || !form.amount) { toast.error('Fill required fields'); return; }
-    const data = { ...form, amount: parseFloat(form.amount) };
+    if (!form.amount) { toast.error('Amount is required'); return; }
+    const data = { ...form, amount: parseFloat(form.amount), description: form.description || undefined, subcategory: form.subcategory || undefined };
     if (editing) {
       updateTransaction(editing.id, data);
       toast.success('Transaction updated');
@@ -66,6 +69,11 @@ export default function TransactionsPage() {
     setDialogOpen(false);
   };
 
+  const getCategoryName = (catId: string) => {
+    const group = categoryGroups.find((g) => g.id === catId);
+    return group?.name || catId || '-';
+  };
+
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
@@ -73,7 +81,6 @@ export default function TransactionsPage() {
         <Button onClick={openAdd} className="gap-2"><Plus size={16} /> Add Transaction</Button>
       </div>
 
-      {/* Month summary */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <div className="stat-card">
           <p className="text-xs text-muted-foreground">Income</p>
@@ -95,9 +102,7 @@ export default function TransactionsPage() {
           <Input placeholder="Search transactions..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 bg-card border-border" />
         </div>
         <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-32 bg-card border-border">
-            <SelectValue />
-          </SelectTrigger>
+          <SelectTrigger className="w-32 bg-card border-border"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All</SelectItem>
             <SelectItem value="income">Income</SelectItem>
@@ -106,7 +111,6 @@ export default function TransactionsPage() {
         </Select>
       </div>
 
-      {/* Table */}
       <div className="glass-card overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -128,8 +132,11 @@ export default function TransactionsPage() {
                     {t.type}
                   </span>
                 </td>
-                <td className="p-3 capitalize">{t.category}</td>
-                <td className="p-3">{t.description}</td>
+                <td className="p-3 capitalize">
+                  {getCategoryName(t.category)}
+                  {t.subcategory && <span className="text-muted-foreground text-xs ml-1">/ {t.subcategory}</span>}
+                </td>
+                <td className="p-3">{t.description || '-'}</td>
                 <td className={`p-3 text-right font-medium ${t.type === 'income' ? 'text-success' : ''}`}>{formatCurrency(t.amount)}</td>
                 <td className="p-3 text-right">
                   <div className="flex gap-1 justify-end">
@@ -144,7 +151,6 @@ export default function TransactionsPage() {
         {filtered.length === 0 && <p className="text-center text-muted-foreground py-8">No transactions found for this month</p>}
       </div>
 
-      {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="bg-card border-border sm:max-w-md">
           <DialogHeader>
@@ -152,23 +158,32 @@ export default function TransactionsPage() {
           </DialogHeader>
           <div className="space-y-3">
             <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="bg-secondary border-border" />
-            <Select value={form.type} onValueChange={(v: any) => setForm({ ...form, type: v })}>
+            <Select value={form.type} onValueChange={(v: any) => setForm({ ...form, type: v, category: '', subcategory: '' })}>
               <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="income">Income</SelectItem>
                 <SelectItem value="expense">Expense</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
-              <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
+            <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v, subcategory: '' })}>
+              <SelectTrigger className="bg-secondary border-border"><SelectValue placeholder="Select category" /></SelectTrigger>
               <SelectContent>
-                {categories.map((c) => <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>)}
+                {allCategories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                {allCategories.length === 0 && <div className="p-2 text-xs text-muted-foreground">No categories. Add them in Settings.</div>}
               </SelectContent>
             </Select>
-            <Input placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="bg-secondary border-border" />
+            {selectedGroup && selectedGroup.subcategories.length > 0 && (
+              <Select value={form.subcategory} onValueChange={(v) => setForm({ ...form, subcategory: v })}>
+                <SelectTrigger className="bg-secondary border-border"><SelectValue placeholder="Select subcategory" /></SelectTrigger>
+                <SelectContent>
+                  {selectedGroup.subcategories.map((sc) => <SelectItem key={sc} value={sc}>{sc}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+            <Input placeholder="Description (optional)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="bg-secondary border-border" />
             <Input type="number" placeholder="Amount" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="bg-secondary border-border" />
             <Select value={form.accountId} onValueChange={(v) => setForm({ ...form, accountId: v })}>
-              <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="bg-secondary border-border"><SelectValue placeholder="Select account" /></SelectTrigger>
               <SelectContent>
                 {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
               </SelectContent>

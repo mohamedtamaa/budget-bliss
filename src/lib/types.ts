@@ -3,7 +3,8 @@ export interface Transaction {
   date: string;
   type: 'income' | 'expense';
   category: string;
-  description: string;
+  subcategory?: string;
+  description?: string;
   amount: number;
   accountId: string;
   notes?: string;
@@ -11,11 +12,19 @@ export interface Transaction {
   isEssential?: boolean;
 }
 
+export interface CategoryGroup {
+  id: string;
+  name: string;
+  type: 'income' | 'expense';
+  subcategories: string[];
+}
+
 export interface RecurringItem {
   id: string;
   name: string;
   type: 'income' | 'expense' | 'loan' | 'subscription';
   category: string;
+  subcategory?: string;
   amount: number;
   startDate: string;
   endDate?: string;
@@ -50,9 +59,12 @@ export interface MonthlyBudgetItem {
   sourceType: 'recurring' | 'loan' | 'manual';
   name: string;
   type: 'income' | 'expense' | 'loan' | 'subscription';
+  category?: string;
+  subcategory?: string;
   amount: number;
   paid: boolean;
   paidDate?: string;
+  finished?: boolean; // mark as finished, won't carry to next month
 }
 
 export interface Account {

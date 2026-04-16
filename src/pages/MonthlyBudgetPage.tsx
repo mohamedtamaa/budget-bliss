@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { useBudgetStore } from '@/lib/budget-store';
 import { format, addMonths, parse } from 'date-fns';
-import { CalendarPlus, Check } from 'lucide-react';
+import { CalendarPlus, Check, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import MonthFilter from '@/components/MonthFilter';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const formatCurrency = (n: number) => new Intl.NumberFormat('en-EG', { minimumFractionDigits: 2 }).format(n);
 
 export default function MonthlyBudgetPage() {
-  const { monthlyBudgets, createNextMonthBudget, toggleBudgetItemPaid } = useBudgetStore();
+  const { monthlyBudgets, createNextMonthBudget, toggleBudgetItemPaid, toggleBudgetItemFinished } = useBudgetStore();
   const sorted = [...monthlyBudgets].sort((a, b) => b.month.localeCompare(a.month));
   const [selectedMonth, setSelectedMonth] = useState(sorted[0]?.month || format(new Date(), 'yyyy-MM'));
   const budget = monthlyBudgets.find((b) => b.month === selectedMonth);
@@ -34,6 +35,51 @@ export default function MonthlyBudgetPage() {
   const totalExpenses = expenseItems.reduce((s, i) => s + i.amount, 0);
   const totalLoans = loanItems.reduce((s, i) => s + i.amount, 0);
 
+  const renderSection = (title: string, items: typeof incomeItems, color: string) => (
+    <div className="glass-card p-4">
+      <h3 className={`text-sm font-medium mb-3 ${color}`}>{title}</h3>
+      <div className="space-y-2">
+        {items.map((item) => (
+          <div key={item.id} className={`flex items-center justify-between py-2 border-b border-border/30 last:border-0 ${item.finished ? 'opacity-40' : ''}`}>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => budget && toggleBudgetItemPaid(budget.id, item.id)}
+                className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
+                  item.paid ? 'bg-primary border-primary' : 'border-muted-foreground/30 hover:border-primary/50'
+                }`}
+              >
+                {item.paid && <Check size={12} className="text-primary-foreground" />}
+              </button>
+              <div>
+                <span className={`text-sm ${item.paid ? 'line-through text-muted-foreground' : ''}`}>{item.name}</span>
+                {item.finished && <span className="text-xs ml-2 text-destructive">(Finished)</span>}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`text-sm font-medium ${item.paid ? 'text-muted-foreground' : ''}`}>{formatCurrency(item.amount)}</span>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => budget && toggleBudgetItemFinished(budget.id, item.id)}
+                      className={`p-1 rounded-lg transition-colors ${item.finished ? 'text-destructive hover:bg-destructive/10' : 'text-muted-foreground hover:bg-secondary'}`}
+                    >
+                      <XCircle size={14} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {item.finished ? 'Unmark as finished' : 'Mark as finished (won\'t carry to next month)'}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          </div>
+        ))}
+        {items.length === 0 && <p className="text-sm text-muted-foreground">No items</p>}
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
@@ -43,7 +89,6 @@ export default function MonthlyBudgetPage() {
 
       {budget ? (
         <div className="space-y-4">
-          {/* Summary */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="stat-card">
               <p className="text-xs text-muted-foreground">Income</p>
@@ -59,37 +104,10 @@ export default function MonthlyBudgetPage() {
             </div>
           </div>
 
-          {/* Sections */}
-          {[
-            { title: 'Income', items: incomeItems, color: 'text-success' },
-            { title: 'Expenses & Subscriptions', items: expenseItems, color: 'text-warning' },
-            { title: 'Loan Payments', items: loanItems, color: 'text-loan' },
-          ].map((section) => (
-            <div key={section.title} className="glass-card p-4">
-              <h3 className={`text-sm font-medium mb-3 ${section.color}`}>{section.title}</h3>
-              <div className="space-y-2">
-                {section.items.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between py-2 border-b border-border/30 last:border-0">
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => toggleBudgetItemPaid(budget.id, item.id)}
-                        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
-                          item.paid ? 'bg-primary border-primary' : 'border-muted-foreground/30 hover:border-primary/50'
-                        }`}
-                      >
-                        {item.paid && <Check size={12} className="text-primary-foreground" />}
-                      </button>
-                      <span className={`text-sm ${item.paid ? 'line-through text-muted-foreground' : ''}`}>{item.name}</span>
-                    </div>
-                    <span className={`text-sm font-medium ${item.paid ? 'text-muted-foreground' : ''}`}>{formatCurrency(item.amount)}</span>
-                  </div>
-                ))}
-                {section.items.length === 0 && <p className="text-sm text-muted-foreground">No items</p>}
-              </div>
-            </div>
-          ))}
+          {renderSection('Income', incomeItems, 'text-success')}
+          {renderSection('Expenses & Subscriptions', expenseItems, 'text-warning')}
+          {renderSection('Loan Payments', loanItems, 'text-loan')}
 
-          {/* Net */}
           <div className="stat-card glow-primary">
             <div className="flex justify-between items-center">
               <span className="font-medium">Net Balance</span>
