@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { useBudgetStore } from '@/lib/budget-store';
 import { Transaction } from '@/lib/types';
 import { format } from 'date-fns';
-import { Plus, Search, Pencil, Trash2, X } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import MonthFilter from '@/components/MonthFilter';
 
 const categories = ['housing', 'transport', 'food', 'utilities', 'subscriptions', 'personal', 'debt', 'salary', 'freelance', 'other'];
 const formatCurrency = (n: number) => new Intl.NumberFormat('en-EG', { minimumFractionDigits: 2 }).format(n);
@@ -16,6 +17,7 @@ export default function TransactionsPage() {
   const { transactions, accounts, addTransaction, updateTransaction, deleteTransaction } = useBudgetStore();
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [form, setForm] = useState({
@@ -31,9 +33,13 @@ export default function TransactionsPage() {
   });
 
   const filtered = transactions
+    .filter((t) => t.date.startsWith(selectedMonth))
     .filter((t) => (typeFilter === 'all' || t.type === typeFilter))
     .filter((t) => t.description.toLowerCase().includes(search.toLowerCase()) || t.category.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => b.date.localeCompare(a.date));
+
+  const monthIncome = filtered.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const monthExpenses = filtered.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
 
   const openAdd = () => {
     setEditing(null);
@@ -63,23 +69,41 @@ export default function TransactionsPage() {
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <div className="flex gap-2 flex-1 w-full sm:w-auto">
-          <div className="relative flex-1 sm:max-w-xs">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input placeholder="Search transactions..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 bg-card border-border" />
-          </div>
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-32 bg-card border-border">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="income">Income</SelectItem>
-              <SelectItem value="expense">Expense</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <MonthFilter value={selectedMonth} onChange={setSelectedMonth} />
         <Button onClick={openAdd} className="gap-2"><Plus size={16} /> Add Transaction</Button>
+      </div>
+
+      {/* Month summary */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="stat-card">
+          <p className="text-xs text-muted-foreground">Income</p>
+          <p className="text-lg font-bold text-success">{formatCurrency(monthIncome)}</p>
+        </div>
+        <div className="stat-card">
+          <p className="text-xs text-muted-foreground">Expenses</p>
+          <p className="text-lg font-bold text-warning">{formatCurrency(monthExpenses)}</p>
+        </div>
+        <div className="stat-card col-span-2 sm:col-span-1">
+          <p className="text-xs text-muted-foreground">Net</p>
+          <p className={`text-lg font-bold ${monthIncome - monthExpenses >= 0 ? 'text-success' : 'text-destructive'}`}>{formatCurrency(monthIncome - monthExpenses)}</p>
+        </div>
+      </div>
+
+      <div className="flex gap-2 w-full">
+        <div className="relative flex-1 sm:max-w-xs">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input placeholder="Search transactions..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 bg-card border-border" />
+        </div>
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-32 bg-card border-border">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="income">Income</SelectItem>
+            <SelectItem value="expense">Expense</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Table */}
@@ -117,7 +141,7 @@ export default function TransactionsPage() {
             ))}
           </tbody>
         </table>
-        {filtered.length === 0 && <p className="text-center text-muted-foreground py-8">No transactions found</p>}
+        {filtered.length === 0 && <p className="text-center text-muted-foreground py-8">No transactions found for this month</p>}
       </div>
 
       {/* Dialog */}

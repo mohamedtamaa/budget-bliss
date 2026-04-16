@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useBudgetStore } from '@/lib/budget-store';
 import { format, addMonths, parse } from 'date-fns';
-import { CalendarPlus, Check, Circle } from 'lucide-react';
+import { CalendarPlus, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import MonthFilter from '@/components/MonthFilter';
 
 const formatCurrency = (n: number) => new Intl.NumberFormat('en-EG', { minimumFractionDigits: 2 }).format(n);
 
@@ -37,12 +37,7 @@ export default function MonthlyBudgetPage() {
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-          <SelectTrigger className="w-48 bg-card border-border"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {sorted.map((b) => <SelectItem key={b.month} value={b.month}>{b.month}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <MonthFilter value={selectedMonth} onChange={setSelectedMonth} />
         <Button onClick={handleCreate} className="gap-2"><CalendarPlus size={16} /> Create Next Month</Button>
       </div>
 

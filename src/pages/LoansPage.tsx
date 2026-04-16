@@ -1,22 +1,43 @@
 import { useState } from 'react';
 import { useBudgetStore } from '@/lib/budget-store';
 import { Loan } from '@/lib/types';
+import { format } from 'date-fns';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
+import MonthFilter from '@/components/MonthFilter';
 
 const formatCurrency = (n: number) => new Intl.NumberFormat('en-EG', { minimumFractionDigits: 2 }).format(n);
 
 export default function LoansPage() {
-  const { loans, addLoan, updateLoan, deleteLoan } = useBudgetStore();
+  const { loans, monthlyBudgets, addLoan, updateLoan, deleteLoan } = useBudgetStore();
+  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Loan | null>(null);
   const [form, setForm] = useState({
     name: '', monthlyAmount: '', startDate: '', endDate: '', remainingPayments: '', dueDay: '', notes: '', active: true, accountId: '',
   });
+
+  // Filter loans active in selected month
+  const activeLoans = loans.filter((l) => {
+    if (!l.active) return false;
+    const startMonth = l.startDate?.slice(0, 7);
+    if (startMonth && startMonth > selectedMonth) return false;
+    const endMonth = l.endDate?.slice(0, 7);
+    if (endMonth && endMonth < selectedMonth) return false;
+    return true;
+  });
+
+  const inactiveLoans = loans.filter((l) => !activeLoans.includes(l));
+
+  // Check budget for paid status
+  const budget = monthlyBudgets.find((b) => b.month === selectedMonth);
+  const getLoanPaidStatus = (loanId: string) => {
+    return budget?.items.find((i) => i.sourceId === loanId && i.sourceType === 'loan')?.paid || false;
+  };
 
   const openAdd = () => {
     setEditing(null);
@@ -46,43 +67,69 @@ export default function LoansPage() {
     setDialogOpen(false);
   };
 
-  const totalMonthly = loans.filter((l) => l.active).reduce((s, l) => s + l.monthlyAmount, 0);
+  const totalMonthly = activeLoans.reduce((s, l) => s + l.monthlyAmount, 0);
 
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <div className="stat-card inline-flex items-center gap-3">
-          <span className="text-sm text-muted-foreground">Total Monthly Loans:</span>
-          <span className="text-lg font-bold text-loan">{formatCurrency(totalMonthly)}</span>
-        </div>
+        <MonthFilter value={selectedMonth} onChange={setSelectedMonth} />
         <Button onClick={openAdd} className="gap-2"><Plus size={16} /> Add Loan</Button>
       </div>
 
+      <div className="stat-card inline-flex items-center gap-3">
+        <span className="text-sm text-muted-foreground">Active Loans ({selectedMonth}):</span>
+        <span className="text-lg font-bold text-loan">{formatCurrency(totalMonthly)}</span>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {loans.map((l) => (
-          <div key={l.id} className={`glass-card p-4 ${!l.active ? 'opacity-50' : ''}`}>
-            <div className="flex justify-between items-start mb-2">
-              <p className="font-medium">{l.name}</p>
-              <div className="flex gap-1">
-                <button onClick={() => openEdit(l)} className="p-1.5 hover:bg-secondary rounded-lg"><Pencil size={14} className="text-muted-foreground" /></button>
-                <button onClick={() => { deleteLoan(l.id); toast.success('Deleted'); }} className="p-1.5 hover:bg-destructive/10 rounded-lg"><Trash2 size={14} className="text-destructive" /></button>
+        {activeLoans.map((l) => {
+          const paid = getLoanPaidStatus(l.id);
+          return (
+            <div key={l.id} className={`glass-card p-4 ${paid ? 'opacity-60' : ''}`}>
+              <div className="flex justify-between items-start mb-2">
+                <div className="flex items-center gap-2">
+                  <p className="font-medium">{l.name}</p>
+                  {paid && <span className="text-xs bg-success/10 text-success px-2 py-0.5 rounded-full">Paid</span>}
+                </div>
+                <div className="flex gap-1">
+                  <button onClick={() => openEdit(l)} className="p-1.5 hover:bg-secondary rounded-lg"><Pencil size={14} className="text-muted-foreground" /></button>
+                  <button onClick={() => { deleteLoan(l.id); toast.success('Deleted'); }} className="p-1.5 hover:bg-destructive/10 rounded-lg"><Trash2 size={14} className="text-destructive" /></button>
+                </div>
+              </div>
+              <p className="text-xl font-bold text-loan">{formatCurrency(l.monthlyAmount)}<span className="text-xs text-muted-foreground font-normal">/mo</span></p>
+              <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                <p>Due day: {l.dueDay}</p>
+                {l.remainingPayments && <p>{l.remainingPayments} payments remaining</p>}
+                {l.endDate && <p>Ends: {l.endDate}</p>}
+                {l.notes && <p>{l.notes}</p>}
               </div>
             </div>
-            <p className="text-xl font-bold text-loan">{formatCurrency(l.monthlyAmount)}<span className="text-xs text-muted-foreground font-normal">/mo</span></p>
-            <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-              <p>Due day: {l.dueDay}</p>
-              {l.remainingPayments && <p>{l.remainingPayments} payments remaining</p>}
-              {l.endDate && <p>Ends: {l.endDate}</p>}
-              {l.notes && <p>{l.notes}</p>}
-            </div>
-            <div className="mt-2">
-              <span className={`text-xs px-2 py-0.5 rounded-full ${l.active ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
-                {l.active ? 'Active' : 'Inactive'}
-              </span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
+
+      {inactiveLoans.length > 0 && (
+        <>
+          <h3 className="text-sm text-muted-foreground font-medium mt-4">Inactive / Not in this month</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {inactiveLoans.map((l) => (
+              <div key={l.id} className="glass-card p-4 opacity-50">
+                <div className="flex justify-between items-start mb-2">
+                  <p className="font-medium">{l.name}</p>
+                  <div className="flex gap-1">
+                    <button onClick={() => openEdit(l)} className="p-1.5 hover:bg-secondary rounded-lg"><Pencil size={14} className="text-muted-foreground" /></button>
+                    <button onClick={() => { deleteLoan(l.id); toast.success('Deleted'); }} className="p-1.5 hover:bg-destructive/10 rounded-lg"><Trash2 size={14} className="text-destructive" /></button>
+                  </div>
+                </div>
+                <p className="text-xl font-bold text-loan">{formatCurrency(l.monthlyAmount)}<span className="text-xs text-muted-foreground font-normal">/mo</span></p>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${l.active ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                  {l.active ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="bg-card border-border sm:max-w-md">
