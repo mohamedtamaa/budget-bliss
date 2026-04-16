@@ -1,55 +1,168 @@
+import { useState } from 'react';
 import { useBudgetStore } from '@/lib/budget-store';
-import { Info } from 'lucide-react';
+import { CategoryGroup } from '@/lib/types';
+import { Plus, Pencil, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from 'sonner';
 
 export default function SettingsPage() {
-  const { recurringItems, loans } = useBudgetStore();
+  const { categoryGroups, addCategoryGroup, updateCategoryGroup, deleteCategoryGroup } = useBudgetStore();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<CategoryGroup | null>(null);
+  const [form, setForm] = useState({ name: '', type: 'expense' as 'income' | 'expense' });
+  const [subInput, setSubInput] = useState('');
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [addSubDialogOpen, setAddSubDialogOpen] = useState(false);
+  const [addSubGroupId, setAddSubGroupId] = useState('');
+  const [newSubName, setNewSubName] = useState('');
 
-  const rules = [
-    { label: 'Included in Income', desc: 'Items flagged as includedInTotal will count toward income totals', count: recurringItems.filter((r) => r.type === 'income' && r.includedInTotal).length },
-    { label: 'Essential Expenses', desc: 'Housing, utilities, and debt payments are considered essential', count: recurringItems.filter((r) => ['housing', 'utilities'].includes(r.category)).length },
-    { label: 'Optional Expenses', desc: 'Personal and subscription costs that can be reduced', count: recurringItems.filter((r) => ['personal', 'subscriptions'].includes(r.category)).length },
-    { label: 'Active Loans', desc: 'Loans that auto-populate monthly budgets until end date', count: loans.filter((l) => l.active).length },
-    { label: 'Auto-Stop on End Date', desc: 'Recurring items and loans with end dates will automatically stop being included in future budgets once the end date has passed', count: recurringItems.filter((r) => r.endDate).length + loans.filter((l) => l.endDate).length },
-  ];
+  const incomeGroups = categoryGroups.filter((g) => g.type === 'income');
+  const expenseGroups = categoryGroups.filter((g) => g.type === 'expense');
 
-  return (
-    <div className="space-y-6 animate-fade-in max-w-2xl">
-      <div className="glass-card p-5">
-        <h3 className="font-medium mb-4">Budget Rules & Logic</h3>
-        <div className="space-y-4">
-          {rules.map((rule) => (
-            <div key={rule.label} className="flex items-start gap-3 py-3 border-b border-border/30 last:border-0">
-              <div className="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <Info size={14} className="text-info" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">{rule.label}</p>
-                  <span className="text-xs bg-secondary px-2 py-0.5 rounded-full text-muted-foreground">{rule.count} items</span>
+  const openAdd = () => {
+    setEditing(null);
+    setForm({ name: '', type: 'expense' });
+    setSubInput('');
+    setDialogOpen(true);
+  };
+
+  const openEdit = (g: CategoryGroup) => {
+    setEditing(g);
+    setForm({ name: g.name, type: g.type });
+    setSubInput(g.subcategories.join(', '));
+    setDialogOpen(true);
+  };
+
+  const save = () => {
+    if (!form.name) { toast.error('Name is required'); return; }
+    const subcategories = subInput.split(',').map((s) => s.trim()).filter(Boolean);
+    if (editing) {
+      updateCategoryGroup(editing.id, { ...form, subcategories });
+      toast.success('Updated');
+    } else {
+      addCategoryGroup({ ...form, subcategories });
+      toast.success('Added');
+    }
+    setDialogOpen(false);
+  };
+
+  const openAddSub = (groupId: string) => {
+    setAddSubGroupId(groupId);
+    setNewSubName('');
+    setAddSubDialogOpen(true);
+  };
+
+  const saveSub = () => {
+    if (!newSubName.trim()) return;
+    const group = categoryGroups.find((g) => g.id === addSubGroupId);
+    if (group) {
+      updateCategoryGroup(addSubGroupId, { subcategories: [...group.subcategories, newSubName.trim()] });
+      toast.success('Subcategory added');
+    }
+    setAddSubDialogOpen(false);
+  };
+
+  const removeSub = (groupId: string, subName: string) => {
+    const group = categoryGroups.find((g) => g.id === groupId);
+    if (group) {
+      updateCategoryGroup(groupId, { subcategories: group.subcategories.filter((s) => s !== subName) });
+      toast.success('Subcategory removed');
+    }
+  };
+
+  const toggleGroup = (id: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const renderGroupSection = (title: string, groups: CategoryGroup[], color: string) => (
+    <div className="glass-card p-4">
+      <h3 className={`text-sm font-medium mb-3 ${color}`}>{title}</h3>
+      {groups.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No groups yet. Add one!</p>
+      ) : (
+        <div className="space-y-1">
+          {groups.map((g) => (
+            <div key={g.id}>
+              <div className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-secondary/30 transition-colors">
+                <button onClick={() => toggleGroup(g.id)} className="flex items-center gap-2 flex-1 text-left">
+                  {g.subcategories.length > 0 ? (
+                    expandedGroups.has(g.id) ? <ChevronDown size={14} className="text-muted-foreground" /> : <ChevronRight size={14} className="text-muted-foreground" />
+                  ) : <div className="w-3.5" />}
+                  <span className="text-sm font-medium">{g.name}</span>
+                  <span className="text-xs text-muted-foreground">({g.subcategories.length} sub)</span>
+                </button>
+                <div className="flex gap-1">
+                  <button onClick={() => openAddSub(g.id)} className="p-1.5 hover:bg-secondary rounded-lg text-xs text-primary">+ Sub</button>
+                  <button onClick={() => openEdit(g)} className="p-1.5 hover:bg-secondary rounded-lg"><Pencil size={14} className="text-muted-foreground" /></button>
+                  <button onClick={() => { deleteCategoryGroup(g.id); toast.success('Deleted'); }} className="p-1.5 hover:bg-destructive/10 rounded-lg"><Trash2 size={14} className="text-destructive" /></button>
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">{rule.desc}</p>
               </div>
+              {expandedGroups.has(g.id) && g.subcategories.length > 0 && (
+                <div className="ml-8 space-y-1 mb-2">
+                  {g.subcategories.map((sub) => (
+                    <div key={sub} className="flex items-center justify-between py-1 px-3 text-sm text-muted-foreground">
+                      <span>{sub}</span>
+                      <button onClick={() => removeSub(g.id, sub)} className="p-1 hover:bg-destructive/10 rounded"><Trash2 size={12} className="text-destructive" /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
-      </div>
+      )}
+    </div>
+  );
 
-      <div className="glass-card p-5">
-        <h3 className="font-medium mb-4">How It Works</h3>
-        <div className="space-y-3 text-sm text-muted-foreground">
-          <p>1. Add your <strong className="text-foreground">recurring items</strong> (salary, rent, subscriptions) and <strong className="text-foreground">loans</strong>.</p>
-          <p>2. Go to <strong className="text-foreground">Monthly Budget</strong> and click <strong className="text-foreground">"Create Next Month"</strong> to generate a new budget.</p>
-          <p>3. All active recurring items and loans will be automatically included.</p>
-          <p>4. Mark items as <strong className="text-foreground">paid</strong> throughout the month to track progress.</p>
-          <p>5. Items with <strong className="text-foreground">end dates</strong> will stop appearing after their end date passes.</p>
-          <p>6. Use <strong className="text-foreground">Transactions</strong> for daily tracking of variable expenses.</p>
+  return (
+    <div className="space-y-4 animate-fade-in">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-lg font-semibold">Category Groups</h2>
+          <p className="text-muted-foreground text-sm">Manage main groups and sub-groups for income & expenses</p>
         </div>
+        <Button onClick={openAdd} className="gap-2"><Plus size={16} /> Add Group</Button>
       </div>
 
-      <div className="glass-card p-5">
-        <h3 className="font-medium mb-2">Data Storage</h3>
-        <p className="text-sm text-muted-foreground">All data is stored locally in your browser. Clearing browser data will reset everything.</p>
-      </div>
+      {renderGroupSection('Income Groups', incomeGroups, 'text-success')}
+      {renderGroupSection('Expense Groups', expenseGroups, 'text-warning')}
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="bg-card border-border sm:max-w-md">
+          <DialogHeader><DialogTitle>{editing ? 'Edit' : 'Add'} Category Group</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <Input placeholder="Group name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="bg-secondary border-border" />
+            <Select value={form.type} onValueChange={(v: any) => setForm({ ...form, type: v })}>
+              <SelectTrigger className="bg-secondary border-border"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="income">Income</SelectItem>
+                <SelectItem value="expense">Expense</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input placeholder="Subcategories (comma-separated)" value={subInput} onChange={(e) => setSubInput(e.target.value)} className="bg-secondary border-border" />
+            <p className="text-xs text-muted-foreground">e.g. Groceries, Restaurant, Coffee</p>
+            <Button onClick={save} className="w-full">{editing ? 'Update' : 'Add'}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={addSubDialogOpen} onOpenChange={setAddSubDialogOpen}>
+        <DialogContent className="bg-card border-border sm:max-w-sm">
+          <DialogHeader><DialogTitle>Add Subcategory</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <Input placeholder="Subcategory name" value={newSubName} onChange={(e) => setNewSubName(e.target.value)} className="bg-secondary border-border" />
+            <Button onClick={saveSub} className="w-full">Add</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
