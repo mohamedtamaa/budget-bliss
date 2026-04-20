@@ -1,52 +1,76 @@
-import { ReactNode, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { ReactNode, useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Receipt, Repeat, Landmark, CalendarRange,
-  Wallet, CreditCard, Settings, Menu, X, ChevronLeft
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
+  Wallet, CreditCard, Settings, Menu, X, LogOut, Bell, BellOff
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { useLoans } from "@/hooks/useFinanceData";
+import { checkLoanReminders, requestNotificationPermission } from "@/lib/notifications";
+import { toast } from "sonner";
 
 const navItems = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/transactions', icon: Receipt, label: 'Transactions' },
-  { to: '/recurring', icon: Repeat, label: 'Recurring' },
-  { to: '/loans', icon: Landmark, label: 'Loans' },
-  { to: '/monthly', icon: CalendarRange, label: 'Monthly Budget' },
-  { to: '/accounts', icon: Wallet, label: 'Accounts' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
+  { to: "/", icon: LayoutDashboard, label: "Dashboard" },
+  { to: "/transactions", icon: Receipt, label: "Transactions" },
+  { to: "/recurring", icon: Repeat, label: "Recurring" },
+  { to: "/loans", icon: Landmark, label: "Loans" },
+  { to: "/cards", icon: CreditCard, label: "Credit Cards" },
+  { to: "/monthly", icon: CalendarRange, label: "Monthly Budget" },
+  { to: "/accounts", icon: Wallet, label: "Accounts" },
+  { to: "/settings", icon: Settings, label: "Settings" },
 ];
+
+const bottomNav = navItems.slice(0, 5);
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, signOut } = useAuth();
+  const { data: loans = [] } = useLoans();
+  const [notifPerm, setNotifPerm] = useState<NotificationPermission>(
+    typeof Notification !== "undefined" ? Notification.permission : "denied"
+  );
+
+  useEffect(() => { if (loans.length) checkLoanReminders(loans); }, [loans]);
+
+  const enableNotif = async () => {
+    const p = await requestNotificationPermission();
+    setNotifPerm(p);
+    if (p === "granted") toast.success("Notifications enabled");
+    else toast.error("Notifications blocked");
+  };
 
   return (
     <div className="min-h-screen flex bg-background">
-      {/* Mobile overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
-      {/* Sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-64 bg-sidebar border-r border-sidebar-border flex flex-col transition-transform duration-300 lg:translate-x-0 lg:static lg:z-auto',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          "fixed inset-y-0 left-0 z-50 w-64 bg-sidebar border-r border-sidebar-border flex flex-col transition-transform duration-300 lg:translate-x-0 lg:static lg:z-auto",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
         <div className="h-16 flex items-center justify-between px-5 border-b border-sidebar-border">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">M</span>
+            <div className="w-9 h-9 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow">
+              <Wallet className="text-primary-foreground" size={18} />
             </div>
-            <span className="font-semibold text-foreground">Mohamed's Budget</span>
+            <div>
+              <div className="font-semibold text-foreground text-sm">Money Manager</div>
+              <div className="text-[10px] text-muted-foreground -mt-0.5">PRO</div>
+            </div>
           </div>
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-muted-foreground hover:text-foreground">
             <X size={20} />
           </button>
         </div>
 
-        <nav className="flex-1 py-4 px-3 space-y-1">
+        <nav className="flex-1 py-4 px-3 space-y-1 overflow-auto">
           {navItems.map((item) => {
             const active = location.pathname === item.to;
             return (
@@ -55,10 +79,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
                 to={item.to}
                 onClick={() => setSidebarOpen(false)}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                  "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
                   active
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+                    ? "bg-primary/15 text-primary shadow-glow"
+                    : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent"
                 )}
               >
                 <item.icon size={18} />
@@ -68,27 +92,51 @@ export function AppLayout({ children }: { children: ReactNode }) {
           })}
         </nav>
 
-        <div className="p-4 border-t border-sidebar-border">
-          <div className="glass-card p-3 text-center">
-            <p className="text-xs text-muted-foreground">Budget Manager v1.0</p>
+        <div className="p-3 border-t border-sidebar-border space-y-2">
+          <div className="px-3 py-2 text-xs">
+            <div className="text-muted-foreground">Signed in as</div>
+            <div className="font-medium text-foreground truncate">{user?.email}</div>
           </div>
+          <Button variant="ghost" size="sm" className="w-full justify-start gap-2" onClick={() => { signOut(); navigate("/auth"); }}>
+            <LogOut size={16} /> Sign out
+          </Button>
         </div>
       </aside>
 
-      {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 border-b border-border flex items-center px-4 lg:px-6 gap-4 bg-background/80 backdrop-blur-sm sticky top-0 z-30">
+        <header className="h-16 border-b border-border flex items-center px-4 lg:px-6 gap-4 bg-background/80 backdrop-blur-xl sticky top-0 z-30">
           <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-muted-foreground hover:text-foreground">
             <Menu size={22} />
           </button>
-          <h1 className="text-lg font-semibold truncate">
-            {navItems.find((n) => n.to === location.pathname)?.label || 'Budget'}
+          <h1 className="text-lg font-semibold truncate flex-1">
+            {navItems.find((n) => n.to === location.pathname)?.label || "Money Manager"}
           </h1>
+          <Button variant="ghost" size="icon" onClick={enableNotif} title={notifPerm === "granted" ? "Notifications on" : "Enable notifications"}>
+            {notifPerm === "granted" ? <Bell size={18} className="text-primary" /> : <BellOff size={18} />}
+          </Button>
         </header>
 
-        <main className="flex-1 p-4 lg:p-6 overflow-auto">
+        <main className="flex-1 p-4 lg:p-6 overflow-auto pb-24 lg:pb-6 animate-fade-in">
           {children}
         </main>
+
+        {/* Mobile bottom nav */}
+        <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-sidebar/95 backdrop-blur-xl border-t border-sidebar-border">
+          <div className="grid grid-cols-5">
+            {bottomNav.map((item) => {
+              const active = location.pathname === item.to;
+              return (
+                <Link key={item.to} to={item.to} className={cn(
+                  "flex flex-col items-center justify-center py-2.5 text-[10px] font-medium gap-1 transition-colors",
+                  active ? "text-primary" : "text-muted-foreground"
+                )}>
+                  <item.icon size={20} />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
       </div>
     </div>
   );
