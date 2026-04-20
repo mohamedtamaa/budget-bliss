@@ -1,155 +1,155 @@
-import { useState } from 'react';
-import { useBudgetStore } from '@/lib/budget-store';
-import { Loan } from '@/lib/types';
-import { format } from 'date-fns';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Switch } from '@/components/ui/switch';
-import { toast } from 'sonner';
-import MonthFilter from '@/components/MonthFilter';
-
-const formatCurrency = (n: number) => new Intl.NumberFormat('en-EG', { minimumFractionDigits: 2 }).format(n);
+import { useState } from "react";
+import { Plus, Trash2, Pencil, Power, AlertCircle, CheckCircle2 } from "lucide-react";
+import { format } from "date-fns";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { useLoans, useLoanMutations, useAccounts, useBudgets, useProfile } from "@/hooks/useFinanceData";
+import { fmtMoney } from "@/lib/format";
 
 export default function LoansPage() {
-  const { loans, monthlyBudgets, addLoan, updateLoan, deleteLoan } = useBudgetStore();
-  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<Loan | null>(null);
+  const { data: loans = [] } = useLoans();
+  const { data: accounts = [] } = useAccounts();
+  const { data: budgets = [] } = useBudgets();
+  const { data: profile } = useProfile();
+  const m = useLoanMutations();
+  const currency = profile?.currency || "EGP";
+
+  const currentMonth = format(new Date(), "yyyy-MM");
+  const monthBudget = budgets.find((b: any) => b.month === currentMonth);
+
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<any>(null);
   const [form, setForm] = useState({
-    name: '', monthlyAmount: '', startDate: '', endDate: '', remainingPayments: '', dueDay: '', notes: '', active: true, accountId: '',
+    name: "", lender: "", monthly_amount: "", start_date: format(new Date(), "yyyy-MM-dd"),
+    end_date: "", due_day: "1", total_payments: "", remaining_payments: "", remaining_balance: "",
+    account_id: "", reminder_days: "3,1,0", active: true, notes: "",
   });
 
-  // Filter loans active in selected month
-  const activeLoans = loans.filter((l) => {
-    if (!l.active) return false;
-    const startMonth = l.startDate?.slice(0, 7);
-    if (startMonth && startMonth > selectedMonth) return false;
-    const endMonth = l.endDate?.slice(0, 7);
-    if (endMonth && endMonth < selectedMonth) return false;
-    return true;
-  });
+  const reset = () => { setForm({ name: "", lender: "", monthly_amount: "", start_date: format(new Date(), "yyyy-MM-dd"), end_date: "", due_day: "1", total_payments: "", remaining_payments: "", remaining_balance: "", account_id: "", reminder_days: "3,1,0", active: true, notes: "" }); setEditing(null); };
 
-  const inactiveLoans = loans.filter((l) => !activeLoans.includes(l));
-
-  // Check budget for paid status
-  const budget = monthlyBudgets.find((b) => b.month === selectedMonth);
-  const getLoanPaidStatus = (loanId: string) => {
-    return budget?.items.find((i) => i.sourceId === loanId && i.sourceType === 'loan')?.paid || false;
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const payload: any = {
+      name: form.name, lender: form.lender || null,
+      monthly_amount: Number(form.monthly_amount),
+      start_date: form.start_date, end_date: form.end_date || null,
+      due_day: Number(form.due_day) || 1,
+      total_payments: form.total_payments ? Number(form.total_payments) : null,
+      remaining_payments: form.remaining_payments ? Number(form.remaining_payments) : null,
+      remaining_balance: form.remaining_balance ? Number(form.remaining_balance) : null,
+      account_id: form.account_id || null,
+      reminder_days: form.reminder_days.split(",").map((s) => Number(s.trim())).filter((n) => !isNaN(n)),
+      active: form.active, notes: form.notes || null,
+    };
+    if (editing) await m.update.mutateAsync({ id: editing.id, ...payload });
+    else await m.create.mutateAsync(payload);
+    setOpen(false); reset();
   };
 
-  const openAdd = () => {
-    setEditing(null);
-    setForm({ name: '', monthlyAmount: '', startDate: '', endDate: '', remainingPayments: '', dueDay: '', notes: '', active: true, accountId: '' });
-    setDialogOpen(true);
-  };
-
-  const openEdit = (l: Loan) => {
+  const startEdit = (l: any) => {
     setEditing(l);
     setForm({
-      name: l.name, monthlyAmount: String(l.monthlyAmount), startDate: l.startDate, endDate: l.endDate || '',
-      remainingPayments: l.remainingPayments ? String(l.remainingPayments) : '', dueDay: String(l.dueDay),
-      notes: l.notes || '', active: l.active, accountId: l.accountId || '',
+      name: l.name, lender: l.lender || "", monthly_amount: String(l.monthly_amount),
+      start_date: l.start_date, end_date: l.end_date || "", due_day: String(l.due_day),
+      total_payments: l.total_payments?.toString() || "", remaining_payments: l.remaining_payments?.toString() || "",
+      remaining_balance: l.remaining_balance?.toString() || "",
+      account_id: l.account_id || "", reminder_days: (l.reminder_days || []).join(","),
+      active: l.active, notes: l.notes || "",
     });
-    setDialogOpen(true);
+    setOpen(true);
   };
 
-  const save = () => {
-    if (!form.name || !form.monthlyAmount || !form.dueDay) { toast.error('Fill required fields'); return; }
-    const data = {
-      name: form.name, monthlyAmount: parseFloat(form.monthlyAmount), startDate: form.startDate,
-      endDate: form.endDate || undefined, remainingPayments: form.remainingPayments ? parseInt(form.remainingPayments) : undefined,
-      dueDay: parseInt(form.dueDay), notes: form.notes || undefined, active: form.active, accountId: form.accountId || undefined,
-    };
-    if (editing) { updateLoan(editing.id, data); toast.success('Updated'); }
-    else { addLoan(data); toast.success('Added'); }
-    setDialogOpen(false);
-  };
-
-  const totalMonthly = activeLoans.reduce((s, l) => s + l.monthlyAmount, 0);
+  const totalMonthly = loans.filter((l: any) => l.active).reduce((s: number, l: any) => s + Number(l.monthly_amount), 0);
+  const totalRemaining = loans.reduce((s: number, l: any) => s + Number(l.remaining_balance || 0), 0);
 
   return (
-    <div className="space-y-4 animate-fade-in">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <MonthFilter value={selectedMonth} onChange={setSelectedMonth} />
-        <Button onClick={openAdd} className="gap-2"><Plus size={16} /> Add Loan</Button>
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="stat-card"><div className="text-xs text-muted-foreground mb-1">Monthly loans total</div><div className="text-xl font-bold num">{fmtMoney(totalMonthly, currency)}</div></div>
+        <div className="stat-card"><div className="text-xs text-muted-foreground mb-1">Total remaining balance</div><div className="text-xl font-bold num">{fmtMoney(totalRemaining, currency)}</div></div>
       </div>
 
-      <div className="stat-card inline-flex items-center gap-3">
-        <span className="text-sm text-muted-foreground">Active Loans ({selectedMonth}):</span>
-        <span className="text-lg font-bold text-loan">{formatCurrency(totalMonthly)}</span>
+      <div className="flex justify-end">
+        <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
+          <DialogTrigger asChild><Button><Plus size={16} /> Add loan</Button></DialogTrigger>
+          <DialogContent className="max-w-md max-h-[90vh] overflow-auto">
+            <DialogHeader><DialogTitle>{editing ? "Edit" : "New"} loan</DialogTitle></DialogHeader>
+            <form onSubmit={submit} className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></div>
+                <div><Label>Lender</Label><Input value={form.lender} onChange={(e) => setForm({ ...form, lender: e.target.value })} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>Monthly amount</Label><Input type="number" step="0.01" value={form.monthly_amount} onChange={(e) => setForm({ ...form, monthly_amount: e.target.value })} required /></div>
+                <div><Label>Due day</Label><Input type="number" min={1} max={31} value={form.due_day} onChange={(e) => setForm({ ...form, due_day: e.target.value })} required /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>Start date</Label><Input type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} required /></div>
+                <div><Label>End date (opt)</Label><Input type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>Total payments</Label><Input type="number" value={form.total_payments} onChange={(e) => setForm({ ...form, total_payments: e.target.value })} /></div>
+                <div><Label>Remaining payments</Label><Input type="number" value={form.remaining_payments} onChange={(e) => setForm({ ...form, remaining_payments: e.target.value })} /></div>
+              </div>
+              <div><Label>Remaining balance</Label><Input type="number" step="0.01" value={form.remaining_balance} onChange={(e) => setForm({ ...form, remaining_balance: e.target.value })} /></div>
+              <div>
+                <Label>Account</Label>
+                <Select value={form.account_id} onValueChange={(v) => setForm({ ...form, account_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="Pay from account" /></SelectTrigger>
+                  <SelectContent>{accounts.map((a: any) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div><Label>Reminders (days before, comma-separated)</Label><Input value={form.reminder_days} onChange={(e) => setForm({ ...form, reminder_days: e.target.value })} placeholder="3,1,0" /></div>
+              <div><Label>Notes</Label><Textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
+              <div className="flex items-center justify-between rounded-xl border border-border/60 px-3 py-2">
+                <Label className="m-0">Active</Label>
+                <Switch checked={form.active} onCheckedChange={(v) => setForm({ ...form, active: v })} />
+              </div>
+              <Button type="submit" className="w-full">{editing ? "Save" : "Add"}</Button>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {activeLoans.map((l) => {
-          const paid = getLoanPaidStatus(l.id);
+      <div className="grid sm:grid-cols-2 gap-3">
+        {loans.length ? loans.map((l: any) => {
+          const item = monthBudget?.items.find((i: any) => i.source_id === l.id);
+          const today = new Date();
+          const dueThis = new Date(today.getFullYear(), today.getMonth(), l.due_day);
+          const overdue = !item?.paid && today > dueThis;
           return (
-            <div key={l.id} className={`glass-card p-4 ${paid ? 'opacity-60' : ''}`}>
-              <div className="flex justify-between items-start mb-2">
-                <div className="flex items-center gap-2">
-                  <p className="font-medium">{l.name}</p>
-                  {paid && <span className="text-xs bg-success/10 text-success px-2 py-0.5 rounded-full">Paid</span>}
+            <div key={l.id} className="glass-card p-4">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="min-w-0">
+                  <div className="font-semibold truncate">{l.name}</div>
+                  <div className="text-xs text-muted-foreground">{l.lender || "—"} · due day {l.due_day}</div>
                 </div>
                 <div className="flex gap-1">
-                  <button onClick={() => openEdit(l)} className="p-1.5 hover:bg-secondary rounded-lg"><Pencil size={14} className="text-muted-foreground" /></button>
-                  <button onClick={() => { deleteLoan(l.id); toast.success('Deleted'); }} className="p-1.5 hover:bg-destructive/10 rounded-lg"><Trash2 size={14} className="text-destructive" /></button>
+                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => m.update.mutate({ id: l.id, active: !l.active })}><Power size={14} /></Button>
+                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => startEdit(l)}><Pencil size={14} /></Button>
+                  <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => m.remove.mutate(l.id)}><Trash2 size={14} /></Button>
                 </div>
               </div>
-              <p className="text-xl font-bold text-loan">{formatCurrency(l.monthlyAmount)}<span className="text-xs text-muted-foreground font-normal">/mo</span></p>
-              <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-                <p>Due day: {l.dueDay}</p>
-                {l.remainingPayments && <p>{l.remainingPayments} payments remaining</p>}
-                {l.endDate && <p>Ends: {l.endDate}</p>}
-                {l.notes && <p>{l.notes}</p>}
+              <div className="text-2xl font-bold num mb-2">{fmtMoney(l.monthly_amount, currency)}</div>
+              <div className="flex items-center justify-between text-xs">
+                {item?.paid ? (
+                  <span className="flex items-center gap-1 text-primary"><CheckCircle2 size={14} /> Paid this month</span>
+                ) : overdue ? (
+                  <span className="flex items-center gap-1 text-destructive"><AlertCircle size={14} /> Overdue</span>
+                ) : (
+                  <span className="text-muted-foreground">Due in {Math.max(0, Math.ceil((dueThis.getTime() - today.getTime()) / 86400000))}d</span>
+                )}
+                {l.remaining_payments && <span className="text-muted-foreground">{l.remaining_payments} payments left</span>}
               </div>
             </div>
           );
-        })}
+        }) : <div className="glass-card p-10 text-center text-sm text-muted-foreground sm:col-span-2">No loans yet</div>}
       </div>
-
-      {inactiveLoans.length > 0 && (
-        <>
-          <h3 className="text-sm text-muted-foreground font-medium mt-4">Inactive / Not in this month</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {inactiveLoans.map((l) => (
-              <div key={l.id} className="glass-card p-4 opacity-50">
-                <div className="flex justify-between items-start mb-2">
-                  <p className="font-medium">{l.name}</p>
-                  <div className="flex gap-1">
-                    <button onClick={() => openEdit(l)} className="p-1.5 hover:bg-secondary rounded-lg"><Pencil size={14} className="text-muted-foreground" /></button>
-                    <button onClick={() => { deleteLoan(l.id); toast.success('Deleted'); }} className="p-1.5 hover:bg-destructive/10 rounded-lg"><Trash2 size={14} className="text-destructive" /></button>
-                  </div>
-                </div>
-                <p className="text-xl font-bold text-loan">{formatCurrency(l.monthlyAmount)}<span className="text-xs text-muted-foreground font-normal">/mo</span></p>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${l.active ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
-                  {l.active ? 'Active' : 'Inactive'}
-                </span>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="bg-card border-border sm:max-w-md">
-          <DialogHeader><DialogTitle>{editing ? 'Edit' : 'Add'} Loan</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <Input placeholder="Loan name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="bg-secondary border-border" />
-            <Input type="number" placeholder="Monthly amount" value={form.monthlyAmount} onChange={(e) => setForm({ ...form, monthlyAmount: e.target.value })} className="bg-secondary border-border" />
-            <Input type="number" placeholder="Due day (1-31)" value={form.dueDay} onChange={(e) => setForm({ ...form, dueDay: e.target.value })} className="bg-secondary border-border" />
-            <Input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} className="bg-secondary border-border" />
-            <Input type="date" placeholder="End date (optional)" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} className="bg-secondary border-border" />
-            <Input type="number" placeholder="Remaining payments" value={form.remainingPayments} onChange={(e) => setForm({ ...form, remainingPayments: e.target.value })} className="bg-secondary border-border" />
-            <Input placeholder="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="bg-secondary border-border" />
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Active</span>
-              <Switch checked={form.active} onCheckedChange={(v) => setForm({ ...form, active: v })} />
-            </div>
-            <Button onClick={save} className="w-full">{editing ? 'Update' : 'Add'}</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

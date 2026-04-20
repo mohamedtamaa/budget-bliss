@@ -1,125 +1,80 @@
-import { useState } from 'react';
-import { useBudgetStore } from '@/lib/budget-store';
-import { format, addMonths, parse } from 'date-fns';
-import { CalendarPlus, Check, XCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
-import MonthFilter from '@/components/MonthFilter';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-
-const formatCurrency = (n: number) => new Intl.NumberFormat('en-EG', { minimumFractionDigits: 2 }).format(n);
+import { useMemo, useState } from "react";
+import { CheckCircle2, Circle, Trash2, CalendarPlus, Flag } from "lucide-react";
+import { format } from "date-fns";
+import { Button } from "@/components/ui/button";
+import { MonthFilter } from "@/components/MonthFilter";
+import { useBudgets, useBudgetActions, useProfile } from "@/hooks/useFinanceData";
+import { fmtMoney } from "@/lib/format";
 
 export default function MonthlyBudgetPage() {
-  const { monthlyBudgets, createNextMonthBudget, toggleBudgetItemPaid, toggleBudgetItemFinished } = useBudgetStore();
-  const sorted = [...monthlyBudgets].sort((a, b) => b.month.localeCompare(a.month));
-  const [selectedMonth, setSelectedMonth] = useState(sorted[0]?.month || format(new Date(), 'yyyy-MM'));
-  const budget = monthlyBudgets.find((b) => b.month === selectedMonth);
+  const { data: budgets = [] } = useBudgets();
+  const { data: profile } = useProfile();
+  const a = useBudgetActions();
+  const currency = profile?.currency || "EGP";
 
-  const handleCreate = () => {
-    const latestMonth = sorted[0]?.month || format(new Date(), 'yyyy-MM');
-    const success = createNextMonthBudget(latestMonth);
-    if (success) {
-      const next = format(addMonths(parse(latestMonth + '-01', 'yyyy-MM-dd', new Date()), 1), 'yyyy-MM');
-      setSelectedMonth(next);
-      toast.success(`Budget for ${next} created!`);
-    } else {
-      toast.error('Next month budget already exists');
-    }
-  };
+  const [month, setMonth] = useState(format(new Date(), "yyyy-MM"));
+  const budget = budgets.find((b: any) => b.month === month);
 
-  const incomeItems = budget?.items.filter((i) => i.type === 'income') || [];
-  const expenseItems = budget?.items.filter((i) => i.type === 'expense' || i.type === 'subscription') || [];
-  const loanItems = budget?.items.filter((i) => i.type === 'loan') || [];
-
-  const totalIncome = incomeItems.reduce((s, i) => s + i.amount, 0);
-  const totalExpenses = expenseItems.reduce((s, i) => s + i.amount, 0);
-  const totalLoans = loanItems.reduce((s, i) => s + i.amount, 0);
-
-  const renderSection = (title: string, items: typeof incomeItems, color: string) => (
-    <div className="glass-card p-4">
-      <h3 className={`text-sm font-medium mb-3 ${color}`}>{title}</h3>
-      <div className="space-y-2">
-        {items.map((item) => (
-          <div key={item.id} className={`flex items-center justify-between py-2 border-b border-border/30 last:border-0 ${item.finished ? 'opacity-40' : ''}`}>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => budget && toggleBudgetItemPaid(budget.id, item.id)}
-                className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
-                  item.paid ? 'bg-primary border-primary' : 'border-muted-foreground/30 hover:border-primary/50'
-                }`}
-              >
-                {item.paid && <Check size={12} className="text-primary-foreground" />}
-              </button>
-              <div>
-                <span className={`text-sm ${item.paid ? 'line-through text-muted-foreground' : ''}`}>{item.name}</span>
-                {item.finished && <span className="text-xs ml-2 text-destructive">(Finished)</span>}
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className={`text-sm font-medium ${item.paid ? 'text-muted-foreground' : ''}`}>{formatCurrency(item.amount)}</span>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => budget && toggleBudgetItemFinished(budget.id, item.id)}
-                      className={`p-1 rounded-lg transition-colors ${item.finished ? 'text-destructive hover:bg-destructive/10' : 'text-muted-foreground hover:bg-secondary'}`}
-                    >
-                      <XCircle size={14} />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {item.finished ? 'Unmark as finished' : 'Mark as finished (won\'t carry to next month)'}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-          </div>
-        ))}
-        {items.length === 0 && <p className="text-sm text-muted-foreground">No items</p>}
-      </div>
-    </div>
-  );
+  const totals = useMemo(() => {
+    const items = budget?.items || [];
+    const income = items.filter((i: any) => i.type === "income").reduce((s: number, i: any) => s + Number(i.amount), 0);
+    const expenses = items.filter((i: any) => i.type !== "income").reduce((s: number, i: any) => s + Number(i.amount), 0);
+    const paid = items.filter((i: any) => i.paid).reduce((s: number, i: any) => s + Number(i.amount), 0);
+    const unpaid = items.filter((i: any) => !i.paid).reduce((s: number, i: any) => s + Number(i.amount), 0);
+    return { income, expenses, paid, unpaid };
+  }, [budget]);
 
   return (
-    <div className="space-y-4 animate-fade-in">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <MonthFilter value={selectedMonth} onChange={setSelectedMonth} />
-        <Button onClick={handleCreate} className="gap-2"><CalendarPlus size={16} /> Create Next Month</Button>
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <MonthFilter value={month} onChange={setMonth} />
+        {!budget ? (
+          <Button onClick={() => a.createMonthBudget.mutate(month)} disabled={a.createMonthBudget.isPending}>
+            <CalendarPlus size={16} /> Create budget for {format(new Date(month + "-01"), "MMMM yyyy")}
+          </Button>
+        ) : (
+          <Button variant="outline" onClick={() => a.deleteBudget.mutate(budget.id)}>
+            <Trash2 size={14} /> Delete budget
+          </Button>
+        )}
       </div>
 
       {budget ? (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="stat-card">
-              <p className="text-xs text-muted-foreground">Income</p>
-              <p className="text-xl font-bold text-success">{formatCurrency(totalIncome)}</p>
-            </div>
-            <div className="stat-card">
-              <p className="text-xs text-muted-foreground">Expenses</p>
-              <p className="text-xl font-bold text-warning">{formatCurrency(totalExpenses)}</p>
-            </div>
-            <div className="stat-card">
-              <p className="text-xs text-muted-foreground">Loans</p>
-              <p className="text-xl font-bold text-loan">{formatCurrency(totalLoans)}</p>
-            </div>
+        <>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="stat-card"><div className="text-xs text-muted-foreground mb-1">Income</div><div className="text-lg font-bold text-primary num">{fmtMoney(totals.income, currency)}</div></div>
+            <div className="stat-card"><div className="text-xs text-muted-foreground mb-1">Expenses</div><div className="text-lg font-bold text-destructive num">{fmtMoney(totals.expenses, currency)}</div></div>
+            <div className="stat-card"><div className="text-xs text-muted-foreground mb-1">Paid</div><div className="text-lg font-bold num">{fmtMoney(totals.paid, currency)}</div></div>
+            <div className="stat-card"><div className="text-xs text-muted-foreground mb-1">Unpaid</div><div className="text-lg font-bold text-warning num">{fmtMoney(totals.unpaid, currency)}</div></div>
           </div>
 
-          {renderSection('Income', incomeItems, 'text-success')}
-          {renderSection('Expenses & Subscriptions', expenseItems, 'text-warning')}
-          {renderSection('Loan Payments', loanItems, 'text-loan')}
-
-          <div className="stat-card glow-primary">
-            <div className="flex justify-between items-center">
-              <span className="font-medium">Net Balance</span>
-              <span className={`text-xl font-bold ${totalIncome - totalExpenses - totalLoans >= 0 ? 'text-success' : 'text-destructive'}`}>
-                {formatCurrency(totalIncome - totalExpenses - totalLoans)}
-              </span>
-            </div>
+          <div className="glass-card divide-y divide-border/40">
+            {budget.items.length ? budget.items.map((i: any) => (
+              <div key={i.id} className="flex items-center justify-between p-4 gap-3">
+                <button onClick={() => a.togglePaid.mutate({ item: i })} className="shrink-0">
+                  {i.paid ? <CheckCircle2 className="text-primary" size={22} /> : <Circle className="text-muted-foreground" size={22} />}
+                </button>
+                <div className="flex-1 min-w-0">
+                  <div className={`font-medium truncate ${i.paid ? "line-through text-muted-foreground" : ""}`}>{i.name}</div>
+                  <div className="text-xs text-muted-foreground capitalize">{i.type} · {i.source_type}{i.finished ? " · finished" : ""}</div>
+                </div>
+                <div className={`font-semibold num shrink-0 ${i.type === "income" ? "text-primary" : ""}`}>{fmtMoney(i.amount, currency)}</div>
+                <Button
+                  size="icon" variant="ghost" className={`h-8 w-8 ${i.finished ? "text-warning" : ""}`}
+                  title={i.finished ? "Marked finished — won't carry to next month" : "Mark finished (no carryover)"}
+                  onClick={() => a.toggleFinished.mutate(i)}>
+                  <Flag size={14} />
+                </Button>
+                <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => a.removeItem.mutate(i.id)}><Trash2 size={14} /></Button>
+              </div>
+            )) : <div className="p-10 text-center text-sm text-muted-foreground">No items in this budget</div>}
           </div>
-        </div>
+        </>
       ) : (
-        <div className="glass-card p-8 text-center">
-          <p className="text-muted-foreground">No budget for this month. Create one!</p>
+        <div className="glass-card p-10 text-center">
+          <CalendarPlus className="mx-auto text-muted-foreground mb-3" size={32} />
+          <h3 className="font-semibold mb-1">No budget for {format(new Date(month + "-01"), "MMMM yyyy")}</h3>
+          <p className="text-sm text-muted-foreground">Create one to auto-load active recurring items and loans.</p>
         </div>
       )}
     </div>
