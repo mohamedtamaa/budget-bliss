@@ -35,6 +35,7 @@ const Shell = () => (
         <Route path="/monthly" element={<MonthlyBudgetPage />} />
         <Route path="/accounts" element={<AccountsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/guide" element={<GuidePage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppLayout>
