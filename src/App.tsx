@@ -16,6 +16,7 @@ import CreditCardsPage from "@/pages/CreditCardsPage";
 import MonthlyBudgetPage from "@/pages/MonthlyBudgetPage";
 import AccountsPage from "@/pages/AccountsPage";
 import SettingsPage from "@/pages/SettingsPage";
+import GuidePage from "@/pages/GuidePage";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient({
