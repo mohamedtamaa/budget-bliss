@@ -16,6 +16,7 @@ import CreditCardsPage from "@/pages/CreditCardsPage";
 import MonthlyBudgetPage from "@/pages/MonthlyBudgetPage";
 import AccountsPage from "@/pages/AccountsPage";
 import SettingsPage from "@/pages/SettingsPage";
+import GuidePage from "@/pages/GuidePage";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient({
@@ -34,6 +35,7 @@ const Shell = () => (
         <Route path="/monthly" element={<MonthlyBudgetPage />} />
         <Route path="/accounts" element={<AccountsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/guide" element={<GuidePage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppLayout>
