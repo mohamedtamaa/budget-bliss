@@ -11,12 +11,14 @@ import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import DashboardPage from "@/pages/DashboardPage";
 import TransactionsPage from "@/pages/TransactionsPage";
 import RecurringPage from "@/pages/RecurringPage";
+import SubscriptionsPage from "@/pages/SubscriptionsPage";
 import LoansPage from "@/pages/LoansPage";
 import CreditCardsPage from "@/pages/CreditCardsPage";
 import MonthlyBudgetPage from "@/pages/MonthlyBudgetPage";
 import AccountsPage from "@/pages/AccountsPage";
 import SettingsPage from "@/pages/SettingsPage";
 import GuidePage from "@/pages/GuidePage";
+import QuickAddPage from "@/pages/QuickAddPage";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient({
@@ -30,6 +32,7 @@ const Shell = () => (
         <Route path="/" element={<DashboardPage />} />
         <Route path="/transactions" element={<TransactionsPage />} />
         <Route path="/recurring" element={<RecurringPage />} />
+        <Route path="/subscriptions" element={<SubscriptionsPage />} />
         <Route path="/loans" element={<LoansPage />} />
         <Route path="/cards" element={<CreditCardsPage />} />
         <Route path="/monthly" element={<MonthlyBudgetPage />} />
@@ -52,6 +55,7 @@ const App = () => (
           <Routes>
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/quick-add" element={<QuickAddPage />} />
             <Route path="/*" element={<Shell />} />
           </Routes>
         </AuthProvider>
