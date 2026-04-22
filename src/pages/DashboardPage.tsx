@@ -115,7 +115,7 @@ export default function DashboardPage() {
         <StatCard icon={Landmark} label="Loans Due" value={fmtMoney(stats.loansDue, currency)} accent="warning" />
         <StatCard icon={Repeat} label="Subscriptions" value={fmtMoney(stats.subsDue, currency)} accent="info" />
         <StatCard icon={CreditCard} label="Credit Card Due" value={fmtMoney(stats.cardDue, currency)} accent="warning" />
-        <StatCard icon={TrendingDown} label="Paid This Month" value={fmtMoney(stats.paidThisMonth, currency)} accent="positive" />
+        
       </div>
 
       <div className="grid lg:grid-cols-2 gap-4">
