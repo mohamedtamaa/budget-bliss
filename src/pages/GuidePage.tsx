@@ -1,4 +1,4 @@
-import { Book, ArrowRight, Wallet, Receipt, Repeat, Landmark, CreditCard, CalendarRange, Bell, Settings, TrendingUp, Tv, Zap } from "lucide-react";
+import { Book, ArrowRight, Wallet, Receipt, Repeat, Landmark, CreditCard, Bell, Settings, TrendingUp, Tv, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const pages = [
