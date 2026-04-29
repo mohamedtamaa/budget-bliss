@@ -14,7 +14,6 @@ import RecurringPage from "@/pages/RecurringPage";
 import SubscriptionsPage from "@/pages/SubscriptionsPage";
 import LoansPage from "@/pages/LoansPage";
 import CreditCardsPage from "@/pages/CreditCardsPage";
-import MonthlyBudgetPage from "@/pages/MonthlyBudgetPage";
 import AccountsPage from "@/pages/AccountsPage";
 import SettingsPage from "@/pages/SettingsPage";
 import GuidePage from "@/pages/GuidePage";
@@ -35,7 +34,6 @@ const Shell = () => (
         <Route path="/subscriptions" element={<SubscriptionsPage />} />
         <Route path="/loans" element={<LoansPage />} />
         <Route path="/cards" element={<CreditCardsPage />} />
-        <Route path="/monthly" element={<MonthlyBudgetPage />} />
         <Route path="/accounts" element={<AccountsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/guide" element={<GuidePage />} />
