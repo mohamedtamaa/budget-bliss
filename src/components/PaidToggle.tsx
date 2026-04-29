@@ -18,21 +18,22 @@ export function PaidToggle({ sourceType, sourceId, amount, month }: Props) {
 
   return (
     <Button
-      size="sm"
+      size="icon"
       variant={paid ? "default" : "outline"}
-      onClick={() =>
+      title={paid ? "Paid — tap to undo" : "Mark as paid"}
+      onClick={(e) => {
+        e.stopPropagation();
         m.togglePaid.mutate({
           source_type: sourceType,
           source_id: sourceId,
           amount,
           existingId: existing?.id,
           currentlyPaid: paid,
-        })
-      }
-      className={cn("h-8 gap-1.5 text-xs", paid && "bg-primary text-primary-foreground")}
+        });
+      }}
+      className={cn("h-9 w-9 rounded-full shrink-0", paid && "bg-primary text-primary-foreground")}
     >
-      {paid ? <Check size={14} /> : <Circle size={14} />}
-      {paid ? "Paid" : "Mark paid"}
+      {paid ? <Check size={16} /> : <Circle size={16} />}
     </Button>
   );
 }

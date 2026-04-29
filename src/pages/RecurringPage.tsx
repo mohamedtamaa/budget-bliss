@@ -126,17 +126,19 @@ export default function RecurringPage() {
 
       <div className="glass-card divide-y divide-border/40">
         {items.length ? items.map((i: any) => (
-          <div key={i.id} className="flex items-center justify-between p-4 gap-3">
-            <div className="min-w-0">
-              <div className="font-medium flex items-center gap-2">
+          <div key={i.id} className="flex items-center gap-3 p-3 sm:p-4">
+            {i.active && i.type === "expense" && (
+              <PaidToggle sourceType="recurring" sourceId={i.id} amount={Number(i.amount)} month={month} />
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="font-medium flex items-center gap-2 truncate">
                 {i.name}
                 {!i.active && <span className="text-[10px] px-2 py-0.5 rounded bg-muted text-muted-foreground">paused</span>}
               </div>
-              <div className="text-xs text-muted-foreground capitalize">{i.type} · since {i.start_date}{i.end_date ? ` · until ${i.end_date}` : ""}</div>
+              <div className="text-xs text-muted-foreground capitalize truncate">{i.type} · since {i.start_date}{i.end_date ? ` · until ${i.end_date}` : ""}</div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <div className={`font-semibold num ${i.type === "income" ? "text-primary" : "text-foreground"}`}>{fmtMoney(i.amount, currency)}</div>
-              {i.active && i.type === "expense" && <PaidToggle sourceType="recurring" sourceId={i.id} amount={Number(i.amount)} month={month} />}
+            <div className="flex items-center gap-1 shrink-0">
+              <div className={`font-semibold num text-sm ${i.type === "income" ? "text-primary" : "text-foreground"}`}>{fmtMoney(i.amount, currency)}</div>
               <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => m.update.mutate({ id: i.id, active: !i.active })}><Power size={14} /></Button>
               <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => startEdit(i)}><Pencil size={14} /></Button>
               <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => m.remove.mutate(i.id)}><Trash2 size={14} /></Button>
