@@ -45,13 +45,6 @@ const pages = [
     how: "Add credit cards in the Accounts page with type 'Credit Card'. Set credit_limit, used_amount, and due_amount. This page shows a summary view.",
   },
   {
-    icon: CalendarRange,
-    title: "Monthly Budget",
-    path: "/monthly",
-    what: "A per-month budget generated from your recurring items, subscriptions, and loans. Track what's paid and what's pending.",
-    how: "Click 'Create Budget' and select a month. All active recurring items and loans are pulled in. Mark items as 'Paid' when you pay them. Mark as 'Finished' to exclude from future months (e.g. a paid-off loan).",
-  },
-  {
     icon: Wallet,
     title: "Accounts",
     path: "/accounts",
@@ -93,7 +86,7 @@ export default function GuidePage() {
         <h3 className="font-semibold text-base mb-2">🚀 Quick Start (3 steps)</h3>
         <ol className="text-sm text-muted-foreground space-y-1 list-decimal ml-5">
           <li>Go to <Link to="/accounts" className="text-primary underline">Accounts</Link> → set your real bank balance.</li>
-          <li>Go to <Link to="/monthly" className="text-primary underline">Monthly Budget</Link> → click "Create Budget" for this month.</li>
+          <li>Open <Link to="/recurring" className="text-primary underline">Recurring</Link>, <Link to="/subscriptions" className="text-primary underline">Subscriptions</Link>, and <Link to="/loans" className="text-primary underline">Loans</Link> — pick a month and tap "Mark paid" as you pay each item.</li>
           <li>Start adding <Link to="/transactions" className="text-primary underline">Transactions</Link> daily — everything updates automatically.</li>
         </ol>
       </div>
