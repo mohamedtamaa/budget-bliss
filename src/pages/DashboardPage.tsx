@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import {
   TrendingUp, Wallet, Landmark, CreditCard, Repeat, Tv, ArrowUpRight, ArrowDownRight,
-  HelpCircle, Plus, Trash2, CheckCircle2, Receipt
+  HelpCircle, Plus, Trash2, CheckCircle2, Receipt, Pencil, Info
 } from "lucide-react";
 import { MonthFilter } from "@/components/MonthFilter";
 import {
@@ -15,7 +15,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const SOURCE_OPTIONS: Record<string, string> = {
@@ -53,7 +53,6 @@ export default function DashboardPage() {
     const txIncome = monthTx.filter((t: any) => t.type === "income").reduce((s: number, t: any) => s + Number(t.amount), 0);
     const txExpense = monthTx.filter((t: any) => t.type === "expense").reduce((s: number, t: any) => s + Number(t.amount), 0);
 
-    // Recurring breakdown (non-subscription)
     const recExp = recurring.filter((r: any) => r.active && r.type === "expense");
     const recInc = recurring.filter((r: any) => r.active && r.type === "income");
     const subs = recurring.filter((r: any) => r.active && r.type === "subscription");
@@ -75,8 +74,8 @@ export default function DashboardPage() {
     const cardsDue = accounts.filter((a: any) => a.type === "credit_card").reduce((s: number, a: any) => s + Number(a.due_amount || 0), 0);
 
     const income = txIncome + recurringIncomePaid;
-    // expenses excludes loans/subs/recurring
     const expenses = txExpense;
+    const totalPaidWithCards = recurringPaid + subsPaid + loansPaid + cardsDue;
     const totalPaid = recurringPaid + subsPaid + loansPaid;
     const netCash = income - expenses - totalPaid - cardsDue;
 
@@ -85,7 +84,7 @@ export default function DashboardPage() {
       recurringTotal, recurringPaid, recurringRemaining: recurringTotal - recurringPaid,
       subsTotal, subsPaid, subsRemaining: subsTotal - subsPaid,
       loansTotal, loansPaid, loansRemaining: loansTotal - loansPaid,
-      cardsDue, accountsBalance, totalPaid, netCash,
+      cardsDue, accountsBalance, totalPaid, totalPaidWithCards, netCash,
       hasTx: monthTx.length > 0,
     };
   }, [transactions, accounts, recurring, loans, payments, month]);
@@ -128,7 +127,6 @@ export default function DashboardPage() {
         expense: tx.filter((t: any) => t.type === "expense").reduce((s: number, t: any) => s + Number(t.amount), 0),
       });
     }
-    // If literally everything is 0, show expected from recurring on current month so chart isn't empty
     const allZero = arr.every((x) => x.income === 0 && x.expense === 0);
     if (allZero && (stats.income > 0 || stats.expenses > 0 || stats.totalPaid > 0)) {
       arr[arr.length - 1] = {
@@ -153,6 +151,65 @@ export default function DashboardPage() {
 
   const pieColors = ["hsl(158, 75%, 48%)", "hsl(217, 92%, 60%)", "hsl(38, 92%, 56%)", "hsl(0, 78%, 58%)", "hsl(280, 70%, 60%)"];
 
+  // Built-in card details: clicking shows breakdown
+  const builtInDetails: Record<string, { title: string; description: string; rows: { label: string; value: number }[] }> = {
+    income: {
+      title: "Income",
+      description: "All money coming in this month.",
+      rows: [
+        { label: "Transaction income", value: transactions.filter((t: any) => t.date?.startsWith(month) && t.included_in_total && t.type === "income").reduce((s: number, t: any) => s + Number(t.amount), 0) },
+        { label: "Paid recurring income", value: stats.income - transactions.filter((t: any) => t.date?.startsWith(month) && t.included_in_total && t.type === "income").reduce((s: number, t: any) => s + Number(t.amount), 0) },
+      ],
+    },
+    expenses: {
+      title: "Expenses",
+      description: "Pure transaction expenses (does NOT include loans, subs, or recurring — those have their own card).",
+      rows: [{ label: "Transaction expenses", value: stats.expenses }],
+    },
+    totalPaidAll: {
+      title: "Loans + Subs + Recurring + Cards Paid",
+      description: "Sum of every fixed obligation already settled this month, plus credit-card amount due.",
+      rows: [
+        { label: "Loans paid", value: stats.loansPaid },
+        { label: "Subscriptions paid", value: stats.subsPaid },
+        { label: "Recurring paid", value: stats.recurringPaid },
+        { label: "Credit card due", value: stats.cardsDue },
+      ],
+    },
+    netCash: {
+      title: "Net Cash Remaining",
+      description: "Income − Expenses − (Loans+Subs+Recurring paid) − Credit card due.",
+      rows: [
+        { label: "Income", value: stats.income },
+        { label: "− Expenses", value: -stats.expenses },
+        { label: "− Total paid (loans+subs+recurring)", value: -stats.totalPaid },
+        { label: "− Credit card due", value: -stats.cardsDue },
+      ],
+    },
+    loansTotal: { title: "Loans Total", description: "Monthly amount of all active loans.", rows: loans.filter((l: any) => l.active).map((l: any) => ({ label: l.name, value: Number(l.monthly_amount) })) },
+    subsTotal: { title: "Subscriptions Total", description: "All active subscriptions.", rows: recurring.filter((r: any) => r.active && r.type === "subscription").map((r: any) => ({ label: r.name, value: Number(r.amount) })) },
+    recurringTotal: { title: "Recurring Total", description: "All active recurring expense items.", rows: recurring.filter((r: any) => r.active && r.type === "expense").map((r: any) => ({ label: r.name, value: Number(r.amount) })) },
+    cardsDue: { title: "Credit Card Due", description: "Amount due across all credit cards.", rows: accounts.filter((a: any) => a.type === "credit_card").map((a: any) => ({ label: a.name, value: Number(a.due_amount || 0) })) },
+    loansRem: {
+      title: "Loans Remaining",
+      description: "Active loans not yet marked paid this month.",
+      rows: loans.filter((l: any) => l.active && !payments.some((p: any) => p.source_id === l.id && p.source_type === "loan")).map((l: any) => ({ label: l.name, value: Number(l.monthly_amount) })),
+    },
+    subsRem: {
+      title: "Subscriptions Remaining",
+      description: "Active subscriptions not yet marked paid this month.",
+      rows: recurring.filter((r: any) => r.active && r.type === "subscription" && !payments.some((p: any) => p.source_id === r.id && p.source_type === "subscription")).map((r: any) => ({ label: r.name, value: Number(r.amount) })),
+    },
+    recurringRem: {
+      title: "Recurring Remaining",
+      description: "Active recurring expenses not yet marked paid this month.",
+      rows: recurring.filter((r: any) => r.active && r.type === "expense" && !payments.some((p: any) => p.source_id === r.id && p.source_type === "recurring")).map((r: any) => ({ label: r.name, value: Number(r.amount) })),
+    },
+  };
+
+  const [detailKey, setDetailKey] = useState<string | null>(null);
+  const [editSection, setEditSection] = useState<any | null>(null);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -171,67 +228,93 @@ export default function DashboardPage() {
       {/* === GROUP 1: Cash flow === */}
       <section>
         <h3 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">Cash Flow This Month</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-          <StatCard icon={ArrowUpRight} label="Income" value={fmtMoney(stats.income, currency)} accent="positive" hint="Transactions + paid recurring income" />
-          <StatCard icon={ArrowDownRight} label="Expenses" value={fmtMoney(stats.expenses, currency)} accent="negative" hint="Transaction expenses (excludes loans, subs, recurring)" />
-          <StatCard icon={CheckCircle2} label="Loans + Subs + Recurring Paid" value={fmtMoney(stats.totalPaid, currency)} accent="warning" hint="Sum of items you marked as paid this month" />
-          <StatCard icon={TrendingUp} label="Net Cash Remaining" value={fmtMoney(stats.netCash, currency)} accent={stats.netCash >= 0 ? "positive" : "negative"} hint="Income − Expenses − Paid − Cards due" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+          <StatCard icon={ArrowUpRight} label="Income" value={fmtMoney(stats.income, currency)} accent="positive" onClick={() => setDetailKey("income")} />
+          <StatCard icon={ArrowDownRight} label="Expenses" value={fmtMoney(stats.expenses, currency)} accent="negative" onClick={() => setDetailKey("expenses")} />
+          <StatCard icon={CheckCircle2} label="Paid Obligations" sub="Loans + Subs + Recurring + Cards" value={fmtMoney(stats.totalPaidWithCards, currency)} accent="warning" onClick={() => setDetailKey("totalPaidAll")} />
+          <StatCard icon={TrendingUp} label="Net Cash Remaining" value={fmtMoney(stats.netCash, currency)} accent={stats.netCash >= 0 ? "positive" : "negative"} onClick={() => setDetailKey("netCash")} />
         </div>
       </section>
 
       {/* === GROUP 2: Total monthly amounts === */}
       <section>
         <h3 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">Monthly Totals (Paid + Unpaid)</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-          <StatCard icon={Landmark} label="Loans Total" value={fmtMoney(stats.loansTotal, currency)} accent="warning" />
-          <StatCard icon={Tv} label="Subscriptions Total" value={fmtMoney(stats.subsTotal, currency)} accent="info" />
-          <StatCard icon={Repeat} label="Recurring Total" value={fmtMoney(stats.recurringTotal, currency)} accent="info" />
-          <StatCard icon={CreditCard} label="Credit Card Due" value={fmtMoney(stats.cardsDue, currency)} accent="warning" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+          <StatCard icon={Landmark} label="Loans Total" value={fmtMoney(stats.loansTotal, currency)} accent="warning" onClick={() => setDetailKey("loansTotal")} />
+          <StatCard icon={Tv} label="Subscriptions Total" value={fmtMoney(stats.subsTotal, currency)} accent="info" onClick={() => setDetailKey("subsTotal")} />
+          <StatCard icon={Repeat} label="Recurring Total" value={fmtMoney(stats.recurringTotal, currency)} accent="info" onClick={() => setDetailKey("recurringTotal")} />
+          <StatCard icon={CreditCard} label="Credit Card Due" value={fmtMoney(stats.cardsDue, currency)} accent="warning" onClick={() => setDetailKey("cardsDue")} />
         </div>
       </section>
 
       {/* === GROUP 3: Remaining === */}
       <section>
         <h3 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">Remaining To Pay</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
-          <StatCard icon={Landmark} label="Loans Remaining" value={fmtMoney(stats.loansRemaining, currency)} accent={stats.loansRemaining > 0 ? "negative" : "positive"} />
-          <StatCard icon={Tv} label="Subscriptions Remaining" value={fmtMoney(stats.subsRemaining, currency)} accent={stats.subsRemaining > 0 ? "negative" : "positive"} />
-          <StatCard icon={Repeat} label="Recurring Remaining" value={fmtMoney(stats.recurringRemaining, currency)} accent={stats.recurringRemaining > 0 ? "negative" : "positive"} />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4">
+          <RemainingCard
+            icon={Landmark}
+            label="Loans Remaining"
+            total={stats.loansRemaining}
+            currency={currency}
+            items={loans.filter((l: any) => l.active && !payments.some((p: any) => p.source_id === l.id && p.source_type === "loan")).map((l: any) => ({ name: l.name, amount: Number(l.monthly_amount) }))}
+            onClick={() => setDetailKey("loansRem")}
+          />
+          <RemainingCard
+            icon={Tv}
+            label="Subscriptions Remaining"
+            total={stats.subsRemaining}
+            currency={currency}
+            items={recurring.filter((r: any) => r.active && r.type === "subscription" && !payments.some((p: any) => p.source_id === r.id && p.source_type === "subscription")).map((r: any) => ({ name: r.name, amount: Number(r.amount) }))}
+            onClick={() => setDetailKey("subsRem")}
+          />
+          <RemainingCard
+            icon={Repeat}
+            label="Recurring Remaining"
+            total={stats.recurringRemaining}
+            currency={currency}
+            items={recurring.filter((r: any) => r.active && r.type === "expense" && !payments.some((p: any) => p.source_id === r.id && p.source_type === "recurring")).map((r: any) => ({ name: r.name, amount: Number(r.amount) }))}
+            onClick={() => setDetailKey("recurringRem")}
+          />
         </div>
       </section>
 
       {/* === GROUP 4: Custom sections === */}
       <section>
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-2 gap-2">
           <h3 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Your Custom Sections</h3>
-          <CustomSectionDialog onCreate={(name, formula) => sectionM.create.mutate({ name, formula })} />
+          <SectionFormDialog
+            trigger={<Button size="sm" variant="outline" className="gap-1.5"><Plus size={14} /> Add</Button>}
+            onSave={(name, formula) => sectionM.create.mutate({ name, formula })}
+          />
         </div>
         {customSections.length > 0 ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
             {customSections.map((s: any) => {
               const value = computeSection(s.formula);
               return (
-                <div key={s.id} className="stat-card relative group">
+                <button
+                  key={s.id}
+                  onClick={() => setEditSection(s)}
+                  className="stat-card text-left relative group"
+                >
                   <div className="flex items-start justify-between mb-3">
                     <div className="w-10 h-10 rounded-xl bg-gradient-primary text-primary flex items-center justify-center"><Wallet size={18} /></div>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 opacity-0 group-hover:opacity-100 text-destructive" onClick={() => sectionM.remove.mutate(s.id)}>
-                      <Trash2 size={13} />
-                    </Button>
+                    <Pencil size={13} className="text-muted-foreground opacity-0 group-hover:opacity-100" />
                   </div>
                   <div className="text-xs text-muted-foreground mb-1 font-medium truncate">{s.name}</div>
-                  <div className={`text-lg sm:text-xl font-bold num truncate ${value < 0 ? "text-destructive" : ""}`}>{fmtMoney(value, currency)}</div>
+                  <div className={`text-base sm:text-xl font-bold num truncate ${value < 0 ? "text-destructive" : ""}`}>{fmtMoney(value, currency)}</div>
                   <div className="text-[10px] text-muted-foreground/70 mt-1 truncate">
                     {(s.formula || []).map((f: any, i: number) => (
                       <span key={i}>{i > 0 ? ` ${f.op} ` : f.op === "-" ? "-" : ""}{SOURCE_OPTIONS[f.source] || f.source}</span>
                     ))}
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
         ) : (
           <div className="glass-card p-6 text-sm text-muted-foreground text-center">
-            No custom sections yet. Click "Add Section" to combine any totals into your own card.
+            No custom sections yet. Tap "Add" to combine any totals into your own card.
           </div>
         )}
       </section>
@@ -299,11 +382,46 @@ export default function DashboardPage() {
           </div>
         ) : <div className="h-[100px] flex items-center justify-center text-sm text-muted-foreground">No transactions yet.</div>}
       </div>
+
+      {/* Built-in card details modal */}
+      <Dialog open={!!detailKey} onOpenChange={(o) => !o && setDetailKey(null)}>
+        <DialogContent className="max-w-md">
+          {detailKey && builtInDetails[detailKey] && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2"><Info size={16} className="text-primary" /> {builtInDetails[detailKey].title}</DialogTitle>
+                <DialogDescription>{builtInDetails[detailKey].description}</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-1.5 max-h-[50vh] overflow-auto">
+                {builtInDetails[detailKey].rows.length > 0 ? builtInDetails[detailKey].rows.map((r, i) => (
+                  <div key={i} className="flex items-center justify-between text-sm py-2 px-3 rounded-lg bg-secondary/40">
+                    <span className="text-muted-foreground truncate">{r.label}</span>
+                    <span className={`num font-semibold ${r.value < 0 ? "text-destructive" : ""}`}>{fmtMoney(Math.abs(r.value), currency)}</span>
+                  </div>
+                )) : <div className="text-sm text-muted-foreground text-center py-4">Nothing here yet.</div>}
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit custom section modal */}
+      {editSection && (
+        <SectionFormDialog
+          open
+          onOpenChange={(o) => { if (!o) setEditSection(null); }}
+          initial={editSection}
+          onSave={(name, formula) => { sectionM.update.mutate({ id: editSection.id, name, formula }); setEditSection(null); }}
+          onDelete={() => { sectionM.remove.mutate(editSection.id); setEditSection(null); }}
+        />
+      )}
     </div>
   );
 }
 
-function StatCard({ icon: Icon, label, value, accent, hint }: { icon: any; label: string; value: string; accent: "primary" | "positive" | "negative" | "warning" | "info"; hint?: string }) {
+function StatCard({
+  icon: Icon, label, sub, value, accent, onClick,
+}: { icon: any; label: string; sub?: string; value: string; accent: "primary" | "positive" | "negative" | "warning" | "info"; onClick?: () => void }) {
   const accents: Record<string, string> = {
     primary: "bg-gradient-primary text-primary",
     positive: "bg-gradient-positive text-primary",
@@ -312,37 +430,75 @@ function StatCard({ icon: Icon, label, value, accent, hint }: { icon: any; label
     info: "bg-gradient-info text-info",
   };
   return (
-    <div className="stat-card group" title={hint}>
-      <div className="flex items-start justify-between mb-3">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${accents[accent]}`}><Icon size={18} /></div>
+    <button onClick={onClick} className="stat-card text-left w-full">
+      <div className="flex items-start justify-between mb-2 sm:mb-3">
+        <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center ${accents[accent]}`}><Icon size={16} /></div>
+        {onClick && <Info size={12} className="text-muted-foreground/60" />}
       </div>
-      <div className="text-xs text-muted-foreground mb-1 font-medium truncate">{label}</div>
-      <div className="text-lg sm:text-xl font-bold num truncate">{value}</div>
-      {hint && <div className="text-[10px] text-muted-foreground/60 mt-0.5 line-clamp-2">{hint}</div>}
-    </div>
+      <div className="text-[11px] sm:text-xs text-muted-foreground mb-0.5 font-medium leading-tight">{label}</div>
+      {sub && <div className="text-[9px] text-muted-foreground/60 mb-1 leading-tight">{sub}</div>}
+      <div className="text-base sm:text-xl font-bold num truncate">{value}</div>
+    </button>
   );
 }
 
-function CustomSectionDialog({ onCreate }: { onCreate: (name: string, formula: any[]) => void }) {
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [steps, setSteps] = useState<any[]>([{ source: "income", op: "+" }]);
+function RemainingCard({
+  icon: Icon, label, total, currency, items, onClick,
+}: { icon: any; label: string; total: number; currency: string; items: { name: string; amount: number }[]; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="stat-card text-left w-full">
+      <div className="flex items-start justify-between mb-2">
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${total > 0 ? "bg-gradient-negative text-destructive" : "bg-gradient-positive text-primary"}`}><Icon size={16} /></div>
+        <Info size={12} className="text-muted-foreground/60" />
+      </div>
+      <div className="text-[11px] sm:text-xs text-muted-foreground mb-0.5 font-medium">{label}</div>
+      <div className={`text-base sm:text-xl font-bold num ${total > 0 ? "text-destructive" : ""}`}>{fmtMoney(total, currency)}</div>
+      {items.length > 0 && (
+        <div className="mt-2 space-y-1 border-t border-border/40 pt-2">
+          {items.slice(0, 3).map((it, i) => (
+            <div key={i} className="flex items-center justify-between text-[10px] sm:text-xs">
+              <span className="text-muted-foreground truncate pr-2">{it.name}</span>
+              <span className="num font-medium shrink-0">{fmtMoney(it.amount, currency)}</span>
+            </div>
+          ))}
+          {items.length > 3 && <div className="text-[10px] text-muted-foreground/60">+{items.length - 3} more</div>}
+        </div>
+      )}
+    </button>
+  );
+}
 
-  const reset = () => { setName(""); setSteps([{ source: "income", op: "+" }]); };
+function SectionFormDialog({
+  trigger, open: controlledOpen, onOpenChange, initial, onSave, onDelete,
+}: {
+  trigger?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (o: boolean) => void;
+  initial?: { name: string; formula: any[] };
+  onSave: (name: string, formula: any[]) => void;
+  onDelete?: () => void;
+}) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = onOpenChange ?? setInternalOpen;
+  const [name, setName] = useState(initial?.name || "");
+  const [steps, setSteps] = useState<any[]>(initial?.formula?.length ? initial.formula : [{ source: "income", op: "+" }]);
 
   const submit = () => {
     if (!name.trim() || steps.length === 0) return;
-    onCreate(name.trim(), steps);
-    setOpen(false); reset();
+    onSave(name.trim(), steps);
+    if (!initial) { setName(""); setSteps([{ source: "income", op: "+" }]); }
+    setOpen(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
-      <DialogTrigger asChild>
-        <Button size="sm" variant="outline" className="gap-1.5"><Plus size={14} /> Add Section</Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={setOpen}>
+      {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Create custom section</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>{initial ? "Edit section" : "Create custom section"}</DialogTitle>
+          <DialogDescription>Combine any totals using + and − to build your own card.</DialogDescription>
+        </DialogHeader>
         <div className="space-y-3">
           <div>
             <Label>Section name</Label>
@@ -350,7 +506,7 @@ function CustomSectionDialog({ onCreate }: { onCreate: (name: string, formula: a
           </div>
           <div>
             <Label>Formula</Label>
-            <div className="space-y-2 mt-1">
+            <div className="space-y-2 mt-1 max-h-[40vh] overflow-auto">
               {steps.map((s, i) => (
                 <div key={i} className="flex gap-2">
                   <Select value={s.op} onValueChange={(v) => setSteps(steps.map((x, j) => j === i ? { ...x, op: v } : x))}>
@@ -379,8 +535,11 @@ function CustomSectionDialog({ onCreate }: { onCreate: (name: string, formula: a
             </Button>
           </div>
         </div>
-        <DialogFooter>
-          <Button onClick={submit} disabled={!name.trim()}>Create</Button>
+        <DialogFooter className="gap-2">
+          {onDelete && (
+            <Button variant="destructive" onClick={onDelete} className="mr-auto"><Trash2 size={14} /> Delete</Button>
+          )}
+          <Button onClick={submit} disabled={!name.trim()}>{initial ? "Save" : "Create"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
