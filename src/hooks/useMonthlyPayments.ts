@@ -78,6 +78,15 @@ export function useDashboardSectionMutations() {
       onSuccess: inv,
       onError: (e: any) => toast.error(e.message),
     }),
+    update: useMutation({
+      mutationFn: async (v: { id: string; name?: string; formula?: any[] }) => {
+        const { id, ...rest } = v;
+        const { error } = await supabase.from("dashboard_sections").update(rest).eq("id", id);
+        if (error) throw error;
+      },
+      onSuccess: inv,
+      onError: (e: any) => toast.error(e.message),
+    }),
     remove: useMutation({
       mutationFn: async (id: string) => {
         const { error } = await supabase.from("dashboard_sections").delete().eq("id", id);
