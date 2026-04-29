@@ -7,21 +7,35 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { MonthFilter } from "@/components/MonthFilter";
+import { PaidToggle } from "@/components/PaidToggle";
 import { useRecurring, useRecurringMutations, useAccounts, useCategories, useProfile } from "@/hooks/useFinanceData";
+import { useMonthlyPayments } from "@/hooks/useMonthlyPayments";
 import { fmtMoney } from "@/lib/format";
 
 export default function RecurringPage() {
-  const { data: items = [] } = useRecurring();
+  const { data: allItems = [] } = useRecurring();
+  // Only non-subscription recurring items live here
+  const items = allItems.filter((i: any) => i.type !== "subscription");
   const { data: accounts = [] } = useAccounts();
   const { data: categories = [] } = useCategories();
   const { data: profile } = useProfile();
   const m = useRecurringMutations();
   const currency = profile?.currency || "EGP";
 
+  const [month, setMonth] = useState(format(new Date(), "yyyy-MM"));
+  const { data: payments = [] } = useMonthlyPayments(month);
+
+  const paidTotal = items
+    .filter((i: any) => i.active)
+    .filter((i: any) => payments.some((p: any) => p.source_id === i.id && p.source_type === "recurring"))
+    .reduce((s: number, i: any) => s + Number(i.amount), 0);
+  const totalAll = items.filter((i: any) => i.active).reduce((s: number, i: any) => s + Number(i.amount), 0);
+
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [form, setForm] = useState({
-    name: "", type: "expense" as "income" | "expense" | "subscription",
+    name: "", type: "expense" as "income" | "expense",
     amount: "", start_date: format(new Date(), "yyyy-MM-dd"),
     end_date: "", account_id: "", category_id: "", active: true, included_in_total: true,
   });
@@ -44,7 +58,7 @@ export default function RecurringPage() {
   const startEdit = (it: any) => {
     setEditing(it);
     setForm({
-      name: it.name, type: it.type, amount: String(it.amount),
+      name: it.name, type: it.type === "income" ? "income" : "expense", amount: String(it.amount),
       start_date: it.start_date, end_date: it.end_date || "",
       account_id: it.account_id || "", category_id: it.category_id || "",
       active: it.active, included_in_total: it.included_in_total,
@@ -52,11 +66,12 @@ export default function RecurringPage() {
     setOpen(true);
   };
 
-  const filteredCats = categories.filter((c: any) => c.type === (form.type === "subscription" ? "expense" : form.type));
+  const filteredCats = categories.filter((c: any) => c.type === form.type);
 
   return (
     <div className="space-y-5">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <MonthFilter value={month} onChange={setMonth} />
         <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
           <DialogTrigger asChild><Button><Plus size={16} /> Add recurring</Button></DialogTrigger>
           <DialogContent className="max-w-md">
@@ -71,7 +86,6 @@ export default function RecurringPage() {
                     <SelectContent>
                       <SelectItem value="income">Income</SelectItem>
                       <SelectItem value="expense">Expense</SelectItem>
-                      <SelectItem value="subscription">Subscription</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -99,14 +113,15 @@ export default function RecurringPage() {
                 <Label className="m-0">Active</Label>
                 <Switch checked={form.active} onCheckedChange={(v) => setForm({ ...form, active: v })} />
               </div>
-              <div className="flex items-center justify-between rounded-xl border border-border/60 px-3 py-2">
-                <Label className="m-0">Include in totals</Label>
-                <Switch checked={form.included_in_total} onCheckedChange={(v) => setForm({ ...form, included_in_total: v })} />
-              </div>
               <Button type="submit" className="w-full">{editing ? "Save" : "Add"}</Button>
             </form>
           </DialogContent>
         </Dialog>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="stat-card"><div className="text-xs text-muted-foreground mb-1">Paid this month</div><div className="text-xl font-bold text-primary num">{fmtMoney(paidTotal, currency)}</div></div>
+        <div className="stat-card"><div className="text-xs text-muted-foreground mb-1">Total recurring</div><div className="text-xl font-bold num">{fmtMoney(totalAll, currency)}</div></div>
       </div>
 
       <div className="glass-card divide-y divide-border/40">
@@ -121,6 +136,7 @@ export default function RecurringPage() {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <div className={`font-semibold num ${i.type === "income" ? "text-primary" : "text-foreground"}`}>{fmtMoney(i.amount, currency)}</div>
+              {i.active && i.type === "expense" && <PaidToggle sourceType="recurring" sourceId={i.id} amount={Number(i.amount)} month={month} />}
               <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => m.update.mutate({ id: i.id, active: !i.active })}><Power size={14} /></Button>
               <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => startEdit(i)}><Pencil size={14} /></Button>
               <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => m.remove.mutate(i.id)}><Trash2 size={14} /></Button>

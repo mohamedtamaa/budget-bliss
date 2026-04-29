@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard, Receipt, Repeat, Landmark, CalendarRange,
+  LayoutDashboard, Receipt, Repeat, Landmark,
   Wallet, CreditCard, Settings, Menu, X, LogOut, Bell, BellOff, Tv
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -18,7 +18,6 @@ const navItems = [
   { to: "/subscriptions", icon: Tv, label: "Subscriptions" },
   { to: "/loans", icon: Landmark, label: "Loans" },
   { to: "/cards", icon: CreditCard, label: "Credit Cards" },
-  { to: "/monthly", icon: CalendarRange, label: "Monthly Budget" },
   { to: "/accounts", icon: Wallet, label: "Accounts" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
