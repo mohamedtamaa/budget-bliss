@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2, Pencil, Power, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Plus, Trash2, Pencil, Power, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,19 +8,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { useLoans, useLoanMutations, useAccounts, useBudgets, useProfile } from "@/hooks/useFinanceData";
+import { MonthFilter } from "@/components/MonthFilter";
+import { PaidToggle } from "@/components/PaidToggle";
+import { useLoans, useLoanMutations, useAccounts, useProfile } from "@/hooks/useFinanceData";
+import { useMonthlyPayments } from "@/hooks/useMonthlyPayments";
 import { fmtMoney } from "@/lib/format";
 
 export default function LoansPage() {
   const { data: loans = [] } = useLoans();
   const { data: accounts = [] } = useAccounts();
-  const { data: budgets = [] } = useBudgets();
   const { data: profile } = useProfile();
   const m = useLoanMutations();
   const currency = profile?.currency || "EGP";
 
-  const currentMonth = format(new Date(), "yyyy-MM");
-  const monthBudget = budgets.find((b: any) => b.month === currentMonth);
+  const [month, setMonth] = useState(format(new Date(), "yyyy-MM"));
+  const { data: payments = [] } = useMonthlyPayments(month);
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
@@ -65,16 +67,15 @@ export default function LoansPage() {
   };
 
   const totalMonthly = loans.filter((l: any) => l.active).reduce((s: number, l: any) => s + Number(l.monthly_amount), 0);
+  const paidThisMonth = loans
+    .filter((l: any) => l.active && payments.some((p: any) => p.source_id === l.id && p.source_type === "loan"))
+    .reduce((s: number, l: any) => s + Number(l.monthly_amount), 0);
   const totalRemaining = loans.reduce((s: number, l: any) => s + Number(l.remaining_balance || 0), 0);
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-3">
-        <div className="stat-card"><div className="text-xs text-muted-foreground mb-1">Monthly loans total</div><div className="text-xl font-bold num">{fmtMoney(totalMonthly, currency)}</div></div>
-        <div className="stat-card"><div className="text-xs text-muted-foreground mb-1">Total remaining balance</div><div className="text-xl font-bold num">{fmtMoney(totalRemaining, currency)}</div></div>
-      </div>
-
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <MonthFilter value={month} onChange={setMonth} />
         <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
           <DialogTrigger asChild><Button><Plus size={16} /> Add loan</Button></DialogTrigger>
           <DialogContent className="max-w-md max-h-[90vh] overflow-auto">
@@ -104,7 +105,6 @@ export default function LoansPage() {
                   <SelectContent>{accounts.map((a: any) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div><Label>Reminders (days before, comma-separated)</Label><Input value={form.reminder_days} onChange={(e) => setForm({ ...form, reminder_days: e.target.value })} placeholder="3,1,0" /></div>
               <div><Label>Notes</Label><Textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
               <div className="flex items-center justify-between rounded-xl border border-border/60 px-3 py-2">
                 <Label className="m-0">Active</Label>
@@ -116,12 +116,18 @@ export default function LoansPage() {
         </Dialog>
       </div>
 
+      <div className="grid grid-cols-3 gap-3">
+        <div className="stat-card"><div className="text-xs text-muted-foreground mb-1">Paid this month</div><div className="text-lg font-bold text-primary num">{fmtMoney(paidThisMonth, currency)}</div></div>
+        <div className="stat-card"><div className="text-xs text-muted-foreground mb-1">Monthly total</div><div className="text-lg font-bold num">{fmtMoney(totalMonthly, currency)}</div></div>
+        <div className="stat-card"><div className="text-xs text-muted-foreground mb-1">Remaining balance</div><div className="text-lg font-bold num">{fmtMoney(totalRemaining, currency)}</div></div>
+      </div>
+
       <div className="grid sm:grid-cols-2 gap-3">
         {loans.length ? loans.map((l: any) => {
-          const item = monthBudget?.items.find((i: any) => i.source_id === l.id);
           const today = new Date();
           const dueThis = new Date(today.getFullYear(), today.getMonth(), l.due_day);
-          const overdue = !item?.paid && today > dueThis;
+          const isPaid = payments.some((p: any) => p.source_id === l.id && p.source_type === "loan");
+          const overdue = !isPaid && today > dueThis && month === format(new Date(), "yyyy-MM");
           return (
             <div key={l.id} className="glass-card p-4">
               <div className="flex items-start justify-between gap-2 mb-2">
@@ -136,15 +142,12 @@ export default function LoansPage() {
                 </div>
               </div>
               <div className="text-2xl font-bold num mb-2">{fmtMoney(l.monthly_amount, currency)}</div>
-              <div className="flex items-center justify-between text-xs">
-                {item?.paid ? (
-                  <span className="flex items-center gap-1 text-primary"><CheckCircle2 size={14} /> Paid this month</span>
-                ) : overdue ? (
-                  <span className="flex items-center gap-1 text-destructive"><AlertCircle size={14} /> Overdue</span>
-                ) : (
-                  <span className="text-muted-foreground">Due in {Math.max(0, Math.ceil((dueThis.getTime() - today.getTime()) / 86400000))}d</span>
+              <div className="flex items-center justify-between gap-2">
+                {l.active && <PaidToggle sourceType="loan" sourceId={l.id} amount={Number(l.monthly_amount)} month={month} />}
+                {overdue && !isPaid && (
+                  <span className="flex items-center gap-1 text-destructive text-xs"><AlertCircle size={14} /> Overdue</span>
                 )}
-                {l.remaining_payments && <span className="text-muted-foreground">{l.remaining_payments} payments left</span>}
+                {l.remaining_payments && <span className="text-muted-foreground text-xs ml-auto">{l.remaining_payments} left</span>}
               </div>
             </div>
           );
