@@ -52,13 +52,25 @@ export default function TransactionsPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.amount) return;
+    const amt = Number(form.amount);
     const payload = {
-      date: form.date, type: form.type, amount: Number(form.amount),
+      date: form.date, type: form.type, amount: amt,
       account_id: form.account_id || null, category_id: form.category_id || null,
       description: form.description || null, notes: form.notes || null,
     };
     if (editing) await m.update.mutateAsync({ id: editing.id, ...payload });
     else await m.create.mutateAsync(payload);
+
+    // If this is an expense charged to a credit card, push the amount onto the card's due / used balance
+    const acc = accounts.find((a: any) => a.id === form.account_id);
+    if (!editing && acc && acc.type === "credit_card" && form.type === "expense") {
+      await am.update.mutateAsync({
+        id: acc.id,
+        due_amount: Number(acc.due_amount || 0) + amt,
+        used_amount: Number(acc.used_amount || 0) + amt,
+      });
+    }
+
     setOpen(false); reset();
   };
 
