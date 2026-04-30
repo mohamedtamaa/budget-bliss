@@ -426,12 +426,27 @@ export default function DashboardPage() {
                   </div>
                 )) : <div className="text-sm text-muted-foreground text-center py-4">Nothing here yet.</div>}
               </div>
+              {detailKey && builtInFormulas[detailKey] && (
+                <DialogFooter className="pt-2 border-t border-border/40">
+                  <Button
+                    variant="outline"
+                    className="w-full gap-2"
+                    onClick={() => {
+                      const seed = builtInFormulas[detailKey!];
+                      setDetailKey(null);
+                      setSeedSection(seed);
+                    }}
+                  >
+                    <Pencil size={14} /> Customize this card (add / remove items)
+                  </Button>
+                </DialogFooter>
+              )}
             </>
           )}
         </DialogContent>
       </Dialog>
 
-      {/* Edit custom section modal */}
+      {/* Edit existing custom section */}
       {editSection && (
         <SectionFormDialog
           open
@@ -439,6 +454,16 @@ export default function DashboardPage() {
           initial={editSection}
           onSave={(name, formula) => { sectionM.update.mutate({ id: editSection.id, name, formula }); setEditSection(null); }}
           onDelete={() => { sectionM.remove.mutate(editSection.id); setEditSection(null); }}
+        />
+      )}
+
+      {/* Customize a built-in card → save as a new editable custom section */}
+      {seedSection && (
+        <SectionFormDialog
+          open
+          onOpenChange={(o) => { if (!o) setSeedSection(null); }}
+          initial={seedSection}
+          onSave={(name, formula) => { sectionM.create.mutate({ name, formula }); setSeedSection(null); }}
         />
       )}
     </div>
