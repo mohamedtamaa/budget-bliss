@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { MonthFilter } from "@/components/MonthFilter";
-import { useTransactions, useTransactionMutations, useAccounts, useCategories, useProfile } from "@/hooks/useFinanceData";
+import { useTransactions, useTransactionMutations, useAccounts, useAccountMutations, useCategories, useProfile } from "@/hooks/useFinanceData";
 import { fmtMoney } from "@/lib/format";
 
 export default function TransactionsPage() {
@@ -17,6 +17,7 @@ export default function TransactionsPage() {
   const { data: categories = [] } = useCategories();
   const { data: profile } = useProfile();
   const m = useTransactionMutations();
+  const am = useAccountMutations();
   const currency = profile?.currency || "EGP";
 
   const [month, setMonth] = useState(format(new Date(), "yyyy-MM"));
