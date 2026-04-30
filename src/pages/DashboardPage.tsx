@@ -286,7 +286,7 @@ export default function DashboardPage() {
       {/* === GROUP 4: Custom sections === */}
       <section>
         <div className="flex items-center justify-between mb-2 gap-2">
-          <h3 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Your Custom Sections</h3>
+          <h3 className="text-sm font-bold flex items-center gap-2 text-foreground"><span className="w-1 h-4 rounded bg-info" /> Your Custom Sections</h3>
           <SectionFormDialog
             trigger={<Button size="sm" variant="outline" className="gap-1.5"><Plus size={14} /> Add</Button>}
             onSave={(name, formula) => sectionM.create.mutate({ name, formula })}
