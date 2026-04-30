@@ -172,23 +172,22 @@ export default function DashboardPage() {
       rows: [{ label: "Transaction expenses", value: stats.expenses }],
     },
     totalPaidAll: {
-      title: "Loans + Subs + Recurring + Cards Paid",
-      description: "Sum of every fixed obligation already settled this month, plus credit-card amount due.",
+      title: "Paid Obligations",
+      description: "Sum of every fixed obligation already settled this month, plus current credit-card amount due (kept separate from monthly expenses).",
       rows: [
         { label: "Loans paid", value: stats.loansPaid },
         { label: "Subscriptions paid", value: stats.subsPaid },
         { label: "Recurring paid", value: stats.recurringPaid },
-        { label: "Credit card due", value: stats.cardsDue },
+        { label: "Credit card due (tracked separately)", value: stats.cardsDue },
       ],
     },
     netCash: {
       title: "Net Cash Remaining",
-      description: "Income − Expenses − (Loans+Subs+Recurring paid) − Credit card due.",
+      description: "Income − Expenses − (Loans + Subs + Recurring paid). Credit cards are tracked separately and not subtracted here — pay them from the Credit Cards page.",
       rows: [
         { label: "Income", value: stats.income },
-        { label: "− Expenses", value: -stats.expenses },
+        { label: "− Expenses (excludes credit-card spending)", value: -stats.expenses },
         { label: "− Total paid (loans+subs+recurring)", value: -stats.totalPaid },
-        { label: "− Credit card due", value: -stats.cardsDue },
       ],
     },
     loansTotal: { title: "Loans Total", description: "Monthly amount of all active loans.", rows: loans.filter((l: any) => l.active).map((l: any) => ({ label: l.name, value: Number(l.monthly_amount) })) },
