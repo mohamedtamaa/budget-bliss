@@ -214,26 +214,47 @@ export default function DashboardPage() {
 
   const [detailKey, setDetailKey] = useState<string | null>(null);
   const [editSection, setEditSection] = useState<any | null>(null);
-  const [seedSection, setSeedSection] = useState<{ name: string; formula: any[] } | null>(null);
+  const [seedSection, setSeedSection] = useState<{ name: string; formula: any[]; override_key?: string } | null>(null);
 
   // Default formula behind each built-in card — used when the user wants to customize one
   const builtInFormulas: Record<string, { name: string; formula: any[] }> = {
-    income: { name: "My income", formula: [{ source: "income", op: "+" }] },
-    expenses: { name: "My expenses", formula: [{ source: "expenses", op: "+" }] },
-    totalPaidAll: { name: "My paid obligations", formula: [
+    income: { name: "Income", formula: [{ source: "income", op: "+" }] },
+    expenses: { name: "Expenses", formula: [{ source: "expenses", op: "+" }] },
+    totalPaidAll: { name: "Paid Obligations", formula: [
       { source: "loans_paid", op: "+" }, { source: "subs_paid", op: "+" },
       { source: "recurring_paid", op: "+" }, { source: "cards_due", op: "+" },
     ]},
-    netCash: { name: "My net cash", formula: [
+    netCash: { name: "Net Cash Remaining", formula: [
       { source: "income", op: "+" }, { source: "expenses", op: "-" }, { source: "total_paid", op: "-" },
     ]},
-    loansTotal: { name: "My loans total", formula: [{ source: "loans_total", op: "+" }] },
-    subsTotal: { name: "My subs total", formula: [{ source: "subs_total", op: "+" }] },
-    recurringTotal: { name: "My recurring total", formula: [{ source: "recurring_total", op: "+" }] },
-    cardsDue: { name: "My cards due", formula: [{ source: "cards_due", op: "+" }] },
-    loansRem: { name: "My loans remaining", formula: [{ source: "loans_remaining", op: "+" }] },
-    subsRem: { name: "My subs remaining", formula: [{ source: "subs_remaining", op: "+" }] },
-    recurringRem: { name: "My recurring remaining", formula: [{ source: "recurring_remaining", op: "+" }] },
+    loansTotal: { name: "Loans Total", formula: [{ source: "loans_total", op: "+" }] },
+    subsTotal: { name: "Subscriptions Total", formula: [{ source: "subs_total", op: "+" }] },
+    recurringTotal: { name: "Recurring Total", formula: [{ source: "recurring_total", op: "+" }] },
+    cardsDue: { name: "Credit Card Due", formula: [{ source: "cards_due", op: "+" }] },
+    loansRem: { name: "Loans Remaining", formula: [{ source: "loans_remaining", op: "+" }] },
+    subsRem: { name: "Subscriptions Remaining", formula: [{ source: "subs_remaining", op: "+" }] },
+    recurringRem: { name: "Recurring Remaining", formula: [{ source: "recurring_remaining", op: "+" }] },
+  };
+
+  // Map override_key -> custom section so built-in cards can be replaced by user formulas
+  const overrides: Record<string, any> = {};
+  const pureCustomSections: any[] = [];
+  for (const s of customSections as any[]) {
+    if (s.override_key && builtInFormulas[s.override_key]) overrides[s.override_key] = s;
+    else pureCustomSections.push(s);
+  }
+
+  // Helper to get effective value/label for a built-in card
+  const builtIn = (key: string, defaultValue: number, defaultLabel: string) => {
+    const ov = overrides[key];
+    if (ov) return { value: computeSection(ov.formula), label: ov.name as string, isOverride: true, section: ov };
+    return { value: defaultValue, label: defaultLabel, isOverride: false, section: null as any };
+  };
+
+  const handleBuiltInClick = (key: string) => {
+    const ov = overrides[key];
+    if (ov) setEditSection(ov);
+    else setDetailKey(key);
   };
 
   return (
