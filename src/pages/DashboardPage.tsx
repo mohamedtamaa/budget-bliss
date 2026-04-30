@@ -243,7 +243,7 @@ export default function DashboardPage() {
 
       {/* === GROUP 2: Total monthly amounts === */}
       <section>
-        <h3 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">Monthly Totals (Paid + Unpaid)</h3>
+        <h3 className="text-sm font-bold mb-3 flex items-center gap-2 text-foreground"><span className="w-1 h-4 rounded bg-warning" /> Monthly Totals (Paid + Unpaid)</h3>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
           <StatCard icon={Landmark} label="Loans Total" value={fmtMoney(stats.loansTotal, currency)} accent="warning" onClick={() => setDetailKey("loansTotal")} />
           <StatCard icon={Tv} label="Subscriptions Total" value={fmtMoney(stats.subsTotal, currency)} accent="info" onClick={() => setDetailKey("subsTotal")} />
