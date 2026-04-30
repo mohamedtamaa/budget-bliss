@@ -110,11 +110,18 @@ export default function TransactionsPage() {
               </div>
               <div><Label>Amount</Label><Input type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required /></div>
               <div>
-                <Label>Account</Label>
+                <Label>Account / Pay with</Label>
                 <Select value={form.account_id} onValueChange={(v) => setForm({ ...form, account_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-                  <SelectContent>{accounts.map((a: any) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
+                  <SelectTrigger><SelectValue placeholder="Select account or credit card" /></SelectTrigger>
+                  <SelectContent>{accounts.map((a: any) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name}{a.type === "credit_card" ? " (Credit card)" : ""}
+                    </SelectItem>
+                  ))}</SelectContent>
                 </Select>
+                {form.type === "expense" && accounts.find((a: any) => a.id === form.account_id)?.type === "credit_card" && (
+                  <p className="text-[11px] text-warning mt-1">Charged to credit card — added to that card's due, not to monthly expenses.</p>
+                )}
               </div>
               <div>
                 <Label>Category</Label>
