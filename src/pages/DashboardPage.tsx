@@ -235,6 +235,8 @@ export default function DashboardPage() {
     subsRem: { name: "My subs remaining", formula: [{ source: "subs_remaining", op: "+" }] },
     recurringRem: { name: "My recurring remaining", formula: [{ source: "recurring_remaining", op: "+" }] },
   };
+
+  return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
