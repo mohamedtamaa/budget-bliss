@@ -71,17 +71,21 @@ export function useDashboardSectionMutations() {
   const inv = () => qc.invalidateQueries({ queryKey: ["dashboard_sections"] });
   return {
     create: useMutation({
-      mutationFn: async (v: { name: string; formula: any[] }) => {
-        const { error } = await supabase.from("dashboard_sections").insert({ ...v, user_id: user!.id });
+      mutationFn: async (v: { name: string; formula: any[]; override_key?: string | null }) => {
+        // If overriding a built-in card, replace any existing override for the same key
+        if (v.override_key) {
+          await supabase.from("dashboard_sections").delete().eq("user_id", user!.id).eq("override_key", v.override_key);
+        }
+        const { error } = await supabase.from("dashboard_sections").insert({ ...v, user_id: user!.id } as any);
         if (error) throw error;
       },
       onSuccess: inv,
       onError: (e: any) => toast.error(e.message),
     }),
     update: useMutation({
-      mutationFn: async (v: { id: string; name?: string; formula?: any[] }) => {
+      mutationFn: async (v: { id: string; name?: string; formula?: any[]; override_key?: string | null }) => {
         const { id, ...rest } = v;
-        const { error } = await supabase.from("dashboard_sections").update(rest).eq("id", id);
+        const { error } = await supabase.from("dashboard_sections").update(rest as any).eq("id", id);
         if (error) throw error;
       },
       onSuccess: inv,
