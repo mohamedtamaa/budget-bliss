@@ -469,7 +469,7 @@ export default function DashboardPage() {
                     variant="outline"
                     className="w-full gap-2"
                     onClick={() => {
-                      const seed = builtInFormulas[detailKey!];
+                      const seed = { ...builtInFormulas[detailKey!], override_key: detailKey! };
                       setDetailKey(null);
                       setSeedSection(seed);
                     }}
@@ -483,7 +483,7 @@ export default function DashboardPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit existing custom section */}
+      {/* Edit existing custom section (or override of a built-in) */}
       {editSection && (
         <SectionFormDialog
           open
@@ -494,13 +494,16 @@ export default function DashboardPage() {
         />
       )}
 
-      {/* Customize a built-in card → save as a new editable custom section */}
+      {/* Customize a built-in card → save as override so the built-in card itself updates */}
       {seedSection && (
         <SectionFormDialog
           open
           onOpenChange={(o) => { if (!o) setSeedSection(null); }}
           initial={seedSection}
-          onSave={(name, formula) => { sectionM.create.mutate({ name, formula }); setSeedSection(null); }}
+          onSave={(name, formula) => {
+            sectionM.create.mutate({ name, formula, override_key: seedSection.override_key || null });
+            setSeedSection(null);
+          }}
         />
       )}
     </div>
