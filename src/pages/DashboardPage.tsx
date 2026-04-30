@@ -120,12 +120,13 @@ export default function DashboardPage() {
 
   // Charts
   const last6 = useMemo(() => {
+    const ccIds = new Set(accounts.filter((a: any) => a.type === "credit_card").map((a: any) => a.id));
     const arr: any[] = [];
     const today = new Date();
     for (let i = 5; i >= 0; i--) {
       const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
       const k = format(d, "yyyy-MM");
-      const tx = transactions.filter((t: any) => t.date?.startsWith(k) && t.included_in_total);
+      const tx = transactions.filter((t: any) => t.date?.startsWith(k) && t.included_in_total && !ccIds.has(t.account_id));
       arr.push({
         name: format(d, "MMM"),
         income: tx.filter((t: any) => t.type === "income").reduce((s: number, t: any) => s + Number(t.amount), 0),
@@ -141,7 +142,7 @@ export default function DashboardPage() {
       };
     }
     return arr;
-  }, [transactions, stats]);
+  }, [transactions, accounts, stats]);
 
   const breakdown = useMemo(() => {
     const data = [
