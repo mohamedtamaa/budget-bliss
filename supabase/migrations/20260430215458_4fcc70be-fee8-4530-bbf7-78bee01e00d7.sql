@@ -1,0 +1,2 @@
+ALTER TABLE public.dashboard_sections ADD COLUMN IF NOT EXISTS override_key text;
+CREATE UNIQUE INDEX IF NOT EXISTS dashboard_sections_user_override_unique ON public.dashboard_sections(user_id, override_key) WHERE override_key IS NOT NULL;
