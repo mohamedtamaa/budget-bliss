@@ -214,26 +214,47 @@ export default function DashboardPage() {
 
   const [detailKey, setDetailKey] = useState<string | null>(null);
   const [editSection, setEditSection] = useState<any | null>(null);
-  const [seedSection, setSeedSection] = useState<{ name: string; formula: any[] } | null>(null);
+  const [seedSection, setSeedSection] = useState<{ name: string; formula: any[]; override_key?: string } | null>(null);
 
   // Default formula behind each built-in card — used when the user wants to customize one
   const builtInFormulas: Record<string, { name: string; formula: any[] }> = {
-    income: { name: "My income", formula: [{ source: "income", op: "+" }] },
-    expenses: { name: "My expenses", formula: [{ source: "expenses", op: "+" }] },
-    totalPaidAll: { name: "My paid obligations", formula: [
+    income: { name: "Income", formula: [{ source: "income", op: "+" }] },
+    expenses: { name: "Expenses", formula: [{ source: "expenses", op: "+" }] },
+    totalPaidAll: { name: "Paid Obligations", formula: [
       { source: "loans_paid", op: "+" }, { source: "subs_paid", op: "+" },
       { source: "recurring_paid", op: "+" }, { source: "cards_due", op: "+" },
     ]},
-    netCash: { name: "My net cash", formula: [
+    netCash: { name: "Net Cash Remaining", formula: [
       { source: "income", op: "+" }, { source: "expenses", op: "-" }, { source: "total_paid", op: "-" },
     ]},
-    loansTotal: { name: "My loans total", formula: [{ source: "loans_total", op: "+" }] },
-    subsTotal: { name: "My subs total", formula: [{ source: "subs_total", op: "+" }] },
-    recurringTotal: { name: "My recurring total", formula: [{ source: "recurring_total", op: "+" }] },
-    cardsDue: { name: "My cards due", formula: [{ source: "cards_due", op: "+" }] },
-    loansRem: { name: "My loans remaining", formula: [{ source: "loans_remaining", op: "+" }] },
-    subsRem: { name: "My subs remaining", formula: [{ source: "subs_remaining", op: "+" }] },
-    recurringRem: { name: "My recurring remaining", formula: [{ source: "recurring_remaining", op: "+" }] },
+    loansTotal: { name: "Loans Total", formula: [{ source: "loans_total", op: "+" }] },
+    subsTotal: { name: "Subscriptions Total", formula: [{ source: "subs_total", op: "+" }] },
+    recurringTotal: { name: "Recurring Total", formula: [{ source: "recurring_total", op: "+" }] },
+    cardsDue: { name: "Credit Card Due", formula: [{ source: "cards_due", op: "+" }] },
+    loansRem: { name: "Loans Remaining", formula: [{ source: "loans_remaining", op: "+" }] },
+    subsRem: { name: "Subscriptions Remaining", formula: [{ source: "subs_remaining", op: "+" }] },
+    recurringRem: { name: "Recurring Remaining", formula: [{ source: "recurring_remaining", op: "+" }] },
+  };
+
+  // Map override_key -> custom section so built-in cards can be replaced by user formulas
+  const overrides: Record<string, any> = {};
+  const pureCustomSections: any[] = [];
+  for (const s of customSections as any[]) {
+    if (s.override_key && builtInFormulas[s.override_key]) overrides[s.override_key] = s;
+    else pureCustomSections.push(s);
+  }
+
+  // Helper to get effective value/label for a built-in card
+  const builtIn = (key: string, defaultValue: number, defaultLabel: string) => {
+    const ov = overrides[key];
+    if (ov) return { value: computeSection(ov.formula), label: ov.name as string, isOverride: true, section: ov };
+    return { value: defaultValue, label: defaultLabel, isOverride: false, section: null as any };
+  };
+
+  const handleBuiltInClick = (key: string) => {
+    const ov = overrides[key];
+    if (ov) setEditSection(ov);
+    else setDetailKey(key);
   };
 
   return (
@@ -255,10 +276,18 @@ export default function DashboardPage() {
       <section>
         <h3 className="text-sm font-bold mb-3 flex items-center gap-2 text-foreground"><span className="w-1 h-4 rounded bg-primary" /> Cash Flow This Month</h3>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
-          <StatCard icon={ArrowUpRight} label="Income" value={fmtMoney(stats.income, currency)} accent="positive" onClick={() => setDetailKey("income")} />
-          <StatCard icon={ArrowDownRight} label="Expenses" value={fmtMoney(stats.expenses, currency)} accent="negative" onClick={() => setDetailKey("expenses")} />
-          <StatCard icon={CheckCircle2} label="Paid Obligations" sub="Loans + Subs + Recurring + Cards" value={fmtMoney(stats.totalPaidWithCards, currency)} accent="warning" onClick={() => setDetailKey("totalPaidAll")} />
-          <StatCard icon={TrendingUp} label="Net Cash Remaining" value={fmtMoney(stats.netCash, currency)} accent={stats.netCash >= 0 ? "positive" : "negative"} onClick={() => setDetailKey("netCash")} />
+          {(() => { const b = builtIn("income", stats.income, "Income"); return (
+            <StatCard icon={ArrowUpRight} label={b.label} value={fmtMoney(b.value, currency)} accent="positive" onClick={() => handleBuiltInClick("income")} />
+          ); })()}
+          {(() => { const b = builtIn("expenses", stats.expenses, "Expenses"); return (
+            <StatCard icon={ArrowDownRight} label={b.label} value={fmtMoney(b.value, currency)} accent="negative" onClick={() => handleBuiltInClick("expenses")} />
+          ); })()}
+          {(() => { const b = builtIn("totalPaidAll", stats.totalPaidWithCards, "Paid Obligations"); return (
+            <StatCard icon={CheckCircle2} label={b.label} sub={b.isOverride ? "Customized" : "Loans + Subs + Recurring + Cards"} value={fmtMoney(b.value, currency)} accent="warning" onClick={() => handleBuiltInClick("totalPaidAll")} />
+          ); })()}
+          {(() => { const b = builtIn("netCash", stats.netCash, "Net Cash Remaining"); return (
+            <StatCard icon={TrendingUp} label={b.label} value={fmtMoney(b.value, currency)} accent={b.value >= 0 ? "positive" : "negative"} onClick={() => handleBuiltInClick("netCash")} />
+          ); })()}
         </div>
       </section>
 
@@ -266,10 +295,18 @@ export default function DashboardPage() {
       <section>
         <h3 className="text-sm font-bold mb-3 flex items-center gap-2 text-foreground"><span className="w-1 h-4 rounded bg-warning" /> Monthly Totals (Paid + Unpaid)</h3>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
-          <StatCard icon={Landmark} label="Loans Total" value={fmtMoney(stats.loansTotal, currency)} accent="warning" onClick={() => setDetailKey("loansTotal")} />
-          <StatCard icon={Tv} label="Subscriptions Total" value={fmtMoney(stats.subsTotal, currency)} accent="info" onClick={() => setDetailKey("subsTotal")} />
-          <StatCard icon={Repeat} label="Recurring Total" value={fmtMoney(stats.recurringTotal, currency)} accent="info" onClick={() => setDetailKey("recurringTotal")} />
-          <StatCard icon={CreditCard} label="Credit Card Due" value={fmtMoney(stats.cardsDue, currency)} accent="warning" onClick={() => setDetailKey("cardsDue")} />
+          {(() => { const b = builtIn("loansTotal", stats.loansTotal, "Loans Total"); return (
+            <StatCard icon={Landmark} label={b.label} value={fmtMoney(b.value, currency)} accent="warning" onClick={() => handleBuiltInClick("loansTotal")} />
+          ); })()}
+          {(() => { const b = builtIn("subsTotal", stats.subsTotal, "Subscriptions Total"); return (
+            <StatCard icon={Tv} label={b.label} value={fmtMoney(b.value, currency)} accent="info" onClick={() => handleBuiltInClick("subsTotal")} />
+          ); })()}
+          {(() => { const b = builtIn("recurringTotal", stats.recurringTotal, "Recurring Total"); return (
+            <StatCard icon={Repeat} label={b.label} value={fmtMoney(b.value, currency)} accent="info" onClick={() => handleBuiltInClick("recurringTotal")} />
+          ); })()}
+          {(() => { const b = builtIn("cardsDue", stats.cardsDue, "Credit Card Due"); return (
+            <StatCard icon={CreditCard} label={b.label} value={fmtMoney(b.value, currency)} accent="warning" onClick={() => handleBuiltInClick("cardsDue")} />
+          ); })()}
         </div>
       </section>
 
@@ -279,27 +316,27 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4">
           <RemainingCard
             icon={Landmark}
-            label="Loans Remaining"
-            total={stats.loansRemaining}
+            label={builtIn("loansRem", 0, "Loans Remaining").label}
+            total={overrides["loansRem"] ? computeSection(overrides["loansRem"].formula) : stats.loansRemaining}
             currency={currency}
             items={loans.filter((l: any) => l.active && !payments.some((p: any) => p.source_id === l.id && p.source_type === "loan")).map((l: any) => ({ name: l.name, amount: Number(l.monthly_amount) }))}
-            onClick={() => setDetailKey("loansRem")}
+            onClick={() => handleBuiltInClick("loansRem")}
           />
           <RemainingCard
             icon={Tv}
-            label="Subscriptions Remaining"
-            total={stats.subsRemaining}
+            label={builtIn("subsRem", 0, "Subscriptions Remaining").label}
+            total={overrides["subsRem"] ? computeSection(overrides["subsRem"].formula) : stats.subsRemaining}
             currency={currency}
             items={recurring.filter((r: any) => r.active && r.type === "subscription" && !payments.some((p: any) => p.source_id === r.id && p.source_type === "subscription")).map((r: any) => ({ name: r.name, amount: Number(r.amount) }))}
-            onClick={() => setDetailKey("subsRem")}
+            onClick={() => handleBuiltInClick("subsRem")}
           />
           <RemainingCard
             icon={Repeat}
-            label="Recurring Remaining"
-            total={stats.recurringRemaining}
+            label={builtIn("recurringRem", 0, "Recurring Remaining").label}
+            total={overrides["recurringRem"] ? computeSection(overrides["recurringRem"].formula) : stats.recurringRemaining}
             currency={currency}
             items={recurring.filter((r: any) => r.active && r.type === "expense" && !payments.some((p: any) => p.source_id === r.id && p.source_type === "recurring")).map((r: any) => ({ name: r.name, amount: Number(r.amount) }))}
-            onClick={() => setDetailKey("recurringRem")}
+            onClick={() => handleBuiltInClick("recurringRem")}
           />
         </div>
       </section>
@@ -313,9 +350,9 @@ export default function DashboardPage() {
             onSave={(name, formula) => sectionM.create.mutate({ name, formula })}
           />
         </div>
-        {customSections.length > 0 ? (
+        {pureCustomSections.length > 0 ? (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
-            {customSections.map((s: any) => {
+            {pureCustomSections.map((s: any) => {
               const value = computeSection(s.formula);
               return (
                 <button
@@ -432,7 +469,7 @@ export default function DashboardPage() {
                     variant="outline"
                     className="w-full gap-2"
                     onClick={() => {
-                      const seed = builtInFormulas[detailKey!];
+                      const seed = { ...builtInFormulas[detailKey!], override_key: detailKey! };
                       setDetailKey(null);
                       setSeedSection(seed);
                     }}
@@ -446,7 +483,7 @@ export default function DashboardPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit existing custom section */}
+      {/* Edit existing custom section (or override of a built-in) */}
       {editSection && (
         <SectionFormDialog
           open
@@ -457,13 +494,16 @@ export default function DashboardPage() {
         />
       )}
 
-      {/* Customize a built-in card → save as a new editable custom section */}
+      {/* Customize a built-in card → save as override so the built-in card itself updates */}
       {seedSection && (
         <SectionFormDialog
           open
           onOpenChange={(o) => { if (!o) setSeedSection(null); }}
           initial={seedSection}
-          onSave={(name, formula) => { sectionM.create.mutate({ name, formula }); setSeedSection(null); }}
+          onSave={(name, formula) => {
+            sectionM.create.mutate({ name, formula, override_key: seedSection.override_key || null });
+            setSeedSection(null);
+          }}
         />
       )}
     </div>

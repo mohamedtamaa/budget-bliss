@@ -188,6 +188,7 @@ export type Database = {
           formula: Json
           id: string
           name: string
+          override_key: string | null
           position: number
           user_id: string
         }
@@ -196,6 +197,7 @@ export type Database = {
           formula?: Json
           id?: string
           name: string
+          override_key?: string | null
           position?: number
           user_id: string
         }
@@ -204,6 +206,7 @@ export type Database = {
           formula?: Json
           id?: string
           name?: string
+          override_key?: string | null
           position?: number
           user_id?: string
         }
