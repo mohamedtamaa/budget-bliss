@@ -276,10 +276,18 @@ export default function DashboardPage() {
       <section>
         <h3 className="text-sm font-bold mb-3 flex items-center gap-2 text-foreground"><span className="w-1 h-4 rounded bg-primary" /> Cash Flow This Month</h3>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
-          <StatCard icon={ArrowUpRight} label="Income" value={fmtMoney(stats.income, currency)} accent="positive" onClick={() => setDetailKey("income")} />
-          <StatCard icon={ArrowDownRight} label="Expenses" value={fmtMoney(stats.expenses, currency)} accent="negative" onClick={() => setDetailKey("expenses")} />
-          <StatCard icon={CheckCircle2} label="Paid Obligations" sub="Loans + Subs + Recurring + Cards" value={fmtMoney(stats.totalPaidWithCards, currency)} accent="warning" onClick={() => setDetailKey("totalPaidAll")} />
-          <StatCard icon={TrendingUp} label="Net Cash Remaining" value={fmtMoney(stats.netCash, currency)} accent={stats.netCash >= 0 ? "positive" : "negative"} onClick={() => setDetailKey("netCash")} />
+          {(() => { const b = builtIn("income", stats.income, "Income"); return (
+            <StatCard icon={ArrowUpRight} label={b.label} value={fmtMoney(b.value, currency)} accent="positive" onClick={() => handleBuiltInClick("income")} />
+          ); })()}
+          {(() => { const b = builtIn("expenses", stats.expenses, "Expenses"); return (
+            <StatCard icon={ArrowDownRight} label={b.label} value={fmtMoney(b.value, currency)} accent="negative" onClick={() => handleBuiltInClick("expenses")} />
+          ); })()}
+          {(() => { const b = builtIn("totalPaidAll", stats.totalPaidWithCards, "Paid Obligations"); return (
+            <StatCard icon={CheckCircle2} label={b.label} sub={b.isOverride ? "Customized" : "Loans + Subs + Recurring + Cards"} value={fmtMoney(b.value, currency)} accent="warning" onClick={() => handleBuiltInClick("totalPaidAll")} />
+          ); })()}
+          {(() => { const b = builtIn("netCash", stats.netCash, "Net Cash Remaining"); return (
+            <StatCard icon={TrendingUp} label={b.label} value={fmtMoney(b.value, currency)} accent={b.value >= 0 ? "positive" : "negative"} onClick={() => handleBuiltInClick("netCash")} />
+          ); })()}
         </div>
       </section>
 
@@ -287,10 +295,18 @@ export default function DashboardPage() {
       <section>
         <h3 className="text-sm font-bold mb-3 flex items-center gap-2 text-foreground"><span className="w-1 h-4 rounded bg-warning" /> Monthly Totals (Paid + Unpaid)</h3>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
-          <StatCard icon={Landmark} label="Loans Total" value={fmtMoney(stats.loansTotal, currency)} accent="warning" onClick={() => setDetailKey("loansTotal")} />
-          <StatCard icon={Tv} label="Subscriptions Total" value={fmtMoney(stats.subsTotal, currency)} accent="info" onClick={() => setDetailKey("subsTotal")} />
-          <StatCard icon={Repeat} label="Recurring Total" value={fmtMoney(stats.recurringTotal, currency)} accent="info" onClick={() => setDetailKey("recurringTotal")} />
-          <StatCard icon={CreditCard} label="Credit Card Due" value={fmtMoney(stats.cardsDue, currency)} accent="warning" onClick={() => setDetailKey("cardsDue")} />
+          {(() => { const b = builtIn("loansTotal", stats.loansTotal, "Loans Total"); return (
+            <StatCard icon={Landmark} label={b.label} value={fmtMoney(b.value, currency)} accent="warning" onClick={() => handleBuiltInClick("loansTotal")} />
+          ); })()}
+          {(() => { const b = builtIn("subsTotal", stats.subsTotal, "Subscriptions Total"); return (
+            <StatCard icon={Tv} label={b.label} value={fmtMoney(b.value, currency)} accent="info" onClick={() => handleBuiltInClick("subsTotal")} />
+          ); })()}
+          {(() => { const b = builtIn("recurringTotal", stats.recurringTotal, "Recurring Total"); return (
+            <StatCard icon={Repeat} label={b.label} value={fmtMoney(b.value, currency)} accent="info" onClick={() => handleBuiltInClick("recurringTotal")} />
+          ); })()}
+          {(() => { const b = builtIn("cardsDue", stats.cardsDue, "Credit Card Due"); return (
+            <StatCard icon={CreditCard} label={b.label} value={fmtMoney(b.value, currency)} accent="warning" onClick={() => handleBuiltInClick("cardsDue")} />
+          ); })()}
         </div>
       </section>
 
@@ -300,27 +316,27 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4">
           <RemainingCard
             icon={Landmark}
-            label="Loans Remaining"
-            total={stats.loansRemaining}
+            label={builtIn("loansRem", 0, "Loans Remaining").label}
+            total={overrides["loansRem"] ? computeSection(overrides["loansRem"].formula) : stats.loansRemaining}
             currency={currency}
             items={loans.filter((l: any) => l.active && !payments.some((p: any) => p.source_id === l.id && p.source_type === "loan")).map((l: any) => ({ name: l.name, amount: Number(l.monthly_amount) }))}
-            onClick={() => setDetailKey("loansRem")}
+            onClick={() => handleBuiltInClick("loansRem")}
           />
           <RemainingCard
             icon={Tv}
-            label="Subscriptions Remaining"
-            total={stats.subsRemaining}
+            label={builtIn("subsRem", 0, "Subscriptions Remaining").label}
+            total={overrides["subsRem"] ? computeSection(overrides["subsRem"].formula) : stats.subsRemaining}
             currency={currency}
             items={recurring.filter((r: any) => r.active && r.type === "subscription" && !payments.some((p: any) => p.source_id === r.id && p.source_type === "subscription")).map((r: any) => ({ name: r.name, amount: Number(r.amount) }))}
-            onClick={() => setDetailKey("subsRem")}
+            onClick={() => handleBuiltInClick("subsRem")}
           />
           <RemainingCard
             icon={Repeat}
-            label="Recurring Remaining"
-            total={stats.recurringRemaining}
+            label={builtIn("recurringRem", 0, "Recurring Remaining").label}
+            total={overrides["recurringRem"] ? computeSection(overrides["recurringRem"].formula) : stats.recurringRemaining}
             currency={currency}
             items={recurring.filter((r: any) => r.active && r.type === "expense" && !payments.some((p: any) => p.source_id === r.id && p.source_type === "recurring")).map((r: any) => ({ name: r.name, amount: Number(r.amount) }))}
-            onClick={() => setDetailKey("recurringRem")}
+            onClick={() => handleBuiltInClick("recurringRem")}
           />
         </div>
       </section>
