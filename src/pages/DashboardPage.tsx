@@ -350,9 +350,9 @@ export default function DashboardPage() {
             onSave={(name, formula) => sectionM.create.mutate({ name, formula })}
           />
         </div>
-        {customSections.length > 0 ? (
+        {pureCustomSections.length > 0 ? (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
-            {customSections.map((s: any) => {
+            {pureCustomSections.map((s: any) => {
               const value = computeSection(s.formula);
               return (
                 <button
