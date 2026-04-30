@@ -49,9 +49,12 @@ export default function DashboardPage() {
   const currency = profile?.currency || "EGP";
 
   const stats = useMemo(() => {
+    const creditCardIds = new Set(accounts.filter((a: any) => a.type === "credit_card").map((a: any) => a.id));
     const monthTx = transactions.filter((t: any) => t.date?.startsWith(month) && t.included_in_total);
-    const txIncome = monthTx.filter((t: any) => t.type === "income").reduce((s: number, t: any) => s + Number(t.amount), 0);
-    const txExpense = monthTx.filter((t: any) => t.type === "expense").reduce((s: number, t: any) => s + Number(t.amount), 0);
+    // Expenses paid via a credit card are tracked on the card itself — exclude them from monthly expenses
+    const monthTxNoCards = monthTx.filter((t: any) => !creditCardIds.has(t.account_id));
+    const txIncome = monthTxNoCards.filter((t: any) => t.type === "income").reduce((s: number, t: any) => s + Number(t.amount), 0);
+    const txExpense = monthTxNoCards.filter((t: any) => t.type === "expense").reduce((s: number, t: any) => s + Number(t.amount), 0);
 
     const recExp = recurring.filter((r: any) => r.active && r.type === "expense");
     const recInc = recurring.filter((r: any) => r.active && r.type === "income");
@@ -75,9 +78,11 @@ export default function DashboardPage() {
 
     const income = txIncome + recurringIncomePaid;
     const expenses = txExpense;
+    // Paid Obligations excludes cards (cards have their own card so we don't double-count visually)
     const totalPaidWithCards = recurringPaid + subsPaid + loansPaid + cardsDue;
     const totalPaid = recurringPaid + subsPaid + loansPaid;
-    const netCash = income - expenses - totalPaid - cardsDue;
+    // Net Cash: cards are tracked separately and paid on their own — don't subtract them from net cash here
+    const netCash = income - expenses - totalPaid;
 
     return {
       income, expenses,
