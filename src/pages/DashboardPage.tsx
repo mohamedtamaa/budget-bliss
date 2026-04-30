@@ -49,9 +49,12 @@ export default function DashboardPage() {
   const currency = profile?.currency || "EGP";
 
   const stats = useMemo(() => {
+    const creditCardIds = new Set(accounts.filter((a: any) => a.type === "credit_card").map((a: any) => a.id));
     const monthTx = transactions.filter((t: any) => t.date?.startsWith(month) && t.included_in_total);
-    const txIncome = monthTx.filter((t: any) => t.type === "income").reduce((s: number, t: any) => s + Number(t.amount), 0);
-    const txExpense = monthTx.filter((t: any) => t.type === "expense").reduce((s: number, t: any) => s + Number(t.amount), 0);
+    // Expenses paid via a credit card are tracked on the card itself — exclude them from monthly expenses
+    const monthTxNoCards = monthTx.filter((t: any) => !creditCardIds.has(t.account_id));
+    const txIncome = monthTxNoCards.filter((t: any) => t.type === "income").reduce((s: number, t: any) => s + Number(t.amount), 0);
+    const txExpense = monthTxNoCards.filter((t: any) => t.type === "expense").reduce((s: number, t: any) => s + Number(t.amount), 0);
 
     const recExp = recurring.filter((r: any) => r.active && r.type === "expense");
     const recInc = recurring.filter((r: any) => r.active && r.type === "income");
@@ -75,9 +78,11 @@ export default function DashboardPage() {
 
     const income = txIncome + recurringIncomePaid;
     const expenses = txExpense;
+    // Paid Obligations excludes cards (cards have their own card so we don't double-count visually)
     const totalPaidWithCards = recurringPaid + subsPaid + loansPaid + cardsDue;
     const totalPaid = recurringPaid + subsPaid + loansPaid;
-    const netCash = income - expenses - totalPaid - cardsDue;
+    // Net Cash: cards are tracked separately and paid on their own — don't subtract them from net cash here
+    const netCash = income - expenses - totalPaid;
 
     return {
       income, expenses,
@@ -115,12 +120,13 @@ export default function DashboardPage() {
 
   // Charts
   const last6 = useMemo(() => {
+    const ccIds = new Set(accounts.filter((a: any) => a.type === "credit_card").map((a: any) => a.id));
     const arr: any[] = [];
     const today = new Date();
     for (let i = 5; i >= 0; i--) {
       const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
       const k = format(d, "yyyy-MM");
-      const tx = transactions.filter((t: any) => t.date?.startsWith(k) && t.included_in_total);
+      const tx = transactions.filter((t: any) => t.date?.startsWith(k) && t.included_in_total && !ccIds.has(t.account_id));
       arr.push({
         name: format(d, "MMM"),
         income: tx.filter((t: any) => t.type === "income").reduce((s: number, t: any) => s + Number(t.amount), 0),
@@ -136,7 +142,7 @@ export default function DashboardPage() {
       };
     }
     return arr;
-  }, [transactions, stats]);
+  }, [transactions, accounts, stats]);
 
   const breakdown = useMemo(() => {
     const data = [
@@ -167,23 +173,22 @@ export default function DashboardPage() {
       rows: [{ label: "Transaction expenses", value: stats.expenses }],
     },
     totalPaidAll: {
-      title: "Loans + Subs + Recurring + Cards Paid",
-      description: "Sum of every fixed obligation already settled this month, plus credit-card amount due.",
+      title: "Paid Obligations",
+      description: "Sum of every fixed obligation already settled this month, plus current credit-card amount due (kept separate from monthly expenses).",
       rows: [
         { label: "Loans paid", value: stats.loansPaid },
         { label: "Subscriptions paid", value: stats.subsPaid },
         { label: "Recurring paid", value: stats.recurringPaid },
-        { label: "Credit card due", value: stats.cardsDue },
+        { label: "Credit card due (tracked separately)", value: stats.cardsDue },
       ],
     },
     netCash: {
       title: "Net Cash Remaining",
-      description: "Income − Expenses − (Loans+Subs+Recurring paid) − Credit card due.",
+      description: "Income − Expenses − (Loans + Subs + Recurring paid). Credit cards are tracked separately and not subtracted here — pay them from the Credit Cards page.",
       rows: [
         { label: "Income", value: stats.income },
-        { label: "− Expenses", value: -stats.expenses },
+        { label: "− Expenses (excludes credit-card spending)", value: -stats.expenses },
         { label: "− Total paid (loans+subs+recurring)", value: -stats.totalPaid },
-        { label: "− Credit card due", value: -stats.cardsDue },
       ],
     },
     loansTotal: { title: "Loans Total", description: "Monthly amount of all active loans.", rows: loans.filter((l: any) => l.active).map((l: any) => ({ label: l.name, value: Number(l.monthly_amount) })) },
@@ -209,6 +214,27 @@ export default function DashboardPage() {
 
   const [detailKey, setDetailKey] = useState<string | null>(null);
   const [editSection, setEditSection] = useState<any | null>(null);
+  const [seedSection, setSeedSection] = useState<{ name: string; formula: any[] } | null>(null);
+
+  // Default formula behind each built-in card — used when the user wants to customize one
+  const builtInFormulas: Record<string, { name: string; formula: any[] }> = {
+    income: { name: "My income", formula: [{ source: "income", op: "+" }] },
+    expenses: { name: "My expenses", formula: [{ source: "expenses", op: "+" }] },
+    totalPaidAll: { name: "My paid obligations", formula: [
+      { source: "loans_paid", op: "+" }, { source: "subs_paid", op: "+" },
+      { source: "recurring_paid", op: "+" }, { source: "cards_due", op: "+" },
+    ]},
+    netCash: { name: "My net cash", formula: [
+      { source: "income", op: "+" }, { source: "expenses", op: "-" }, { source: "total_paid", op: "-" },
+    ]},
+    loansTotal: { name: "My loans total", formula: [{ source: "loans_total", op: "+" }] },
+    subsTotal: { name: "My subs total", formula: [{ source: "subs_total", op: "+" }] },
+    recurringTotal: { name: "My recurring total", formula: [{ source: "recurring_total", op: "+" }] },
+    cardsDue: { name: "My cards due", formula: [{ source: "cards_due", op: "+" }] },
+    loansRem: { name: "My loans remaining", formula: [{ source: "loans_remaining", op: "+" }] },
+    subsRem: { name: "My subs remaining", formula: [{ source: "subs_remaining", op: "+" }] },
+    recurringRem: { name: "My recurring remaining", formula: [{ source: "recurring_remaining", op: "+" }] },
+  };
 
   return (
     <div className="space-y-6">
@@ -227,7 +253,7 @@ export default function DashboardPage() {
 
       {/* === GROUP 1: Cash flow === */}
       <section>
-        <h3 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">Cash Flow This Month</h3>
+        <h3 className="text-sm font-bold mb-3 flex items-center gap-2 text-foreground"><span className="w-1 h-4 rounded bg-primary" /> Cash Flow This Month</h3>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
           <StatCard icon={ArrowUpRight} label="Income" value={fmtMoney(stats.income, currency)} accent="positive" onClick={() => setDetailKey("income")} />
           <StatCard icon={ArrowDownRight} label="Expenses" value={fmtMoney(stats.expenses, currency)} accent="negative" onClick={() => setDetailKey("expenses")} />
@@ -238,7 +264,7 @@ export default function DashboardPage() {
 
       {/* === GROUP 2: Total monthly amounts === */}
       <section>
-        <h3 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">Monthly Totals (Paid + Unpaid)</h3>
+        <h3 className="text-sm font-bold mb-3 flex items-center gap-2 text-foreground"><span className="w-1 h-4 rounded bg-warning" /> Monthly Totals (Paid + Unpaid)</h3>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
           <StatCard icon={Landmark} label="Loans Total" value={fmtMoney(stats.loansTotal, currency)} accent="warning" onClick={() => setDetailKey("loansTotal")} />
           <StatCard icon={Tv} label="Subscriptions Total" value={fmtMoney(stats.subsTotal, currency)} accent="info" onClick={() => setDetailKey("subsTotal")} />
@@ -249,7 +275,7 @@ export default function DashboardPage() {
 
       {/* === GROUP 3: Remaining === */}
       <section>
-        <h3 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">Remaining To Pay</h3>
+        <h3 className="text-sm font-bold mb-3 flex items-center gap-2 text-foreground"><span className="w-1 h-4 rounded bg-destructive" /> Remaining To Pay</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4">
           <RemainingCard
             icon={Landmark}
@@ -281,7 +307,7 @@ export default function DashboardPage() {
       {/* === GROUP 4: Custom sections === */}
       <section>
         <div className="flex items-center justify-between mb-2 gap-2">
-          <h3 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Your Custom Sections</h3>
+          <h3 className="text-sm font-bold flex items-center gap-2 text-foreground"><span className="w-1 h-4 rounded bg-info" /> Your Custom Sections</h3>
           <SectionFormDialog
             trigger={<Button size="sm" variant="outline" className="gap-1.5"><Plus size={14} /> Add</Button>}
             onSave={(name, formula) => sectionM.create.mutate({ name, formula })}
@@ -400,12 +426,27 @@ export default function DashboardPage() {
                   </div>
                 )) : <div className="text-sm text-muted-foreground text-center py-4">Nothing here yet.</div>}
               </div>
+              {detailKey && builtInFormulas[detailKey] && (
+                <DialogFooter className="pt-2 border-t border-border/40">
+                  <Button
+                    variant="outline"
+                    className="w-full gap-2"
+                    onClick={() => {
+                      const seed = builtInFormulas[detailKey!];
+                      setDetailKey(null);
+                      setSeedSection(seed);
+                    }}
+                  >
+                    <Pencil size={14} /> Customize this card (add / remove items)
+                  </Button>
+                </DialogFooter>
+              )}
             </>
           )}
         </DialogContent>
       </Dialog>
 
-      {/* Edit custom section modal */}
+      {/* Edit existing custom section */}
       {editSection && (
         <SectionFormDialog
           open
@@ -413,6 +454,16 @@ export default function DashboardPage() {
           initial={editSection}
           onSave={(name, formula) => { sectionM.update.mutate({ id: editSection.id, name, formula }); setEditSection(null); }}
           onDelete={() => { sectionM.remove.mutate(editSection.id); setEditSection(null); }}
+        />
+      )}
+
+      {/* Customize a built-in card → save as a new editable custom section */}
+      {seedSection && (
+        <SectionFormDialog
+          open
+          onOpenChange={(o) => { if (!o) setSeedSection(null); }}
+          initial={seedSection}
+          onSave={(name, formula) => { sectionM.create.mutate({ name, formula }); setSeedSection(null); }}
         />
       )}
     </div>
