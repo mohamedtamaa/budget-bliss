@@ -214,8 +214,27 @@ export default function DashboardPage() {
 
   const [detailKey, setDetailKey] = useState<string | null>(null);
   const [editSection, setEditSection] = useState<any | null>(null);
+  const [seedSection, setSeedSection] = useState<{ name: string; formula: any[] } | null>(null);
 
-  return (
+  // Default formula behind each built-in card — used when the user wants to customize one
+  const builtInFormulas: Record<string, { name: string; formula: any[] }> = {
+    income: { name: "My income", formula: [{ source: "income", op: "+" }] },
+    expenses: { name: "My expenses", formula: [{ source: "expenses", op: "+" }] },
+    totalPaidAll: { name: "My paid obligations", formula: [
+      { source: "loans_paid", op: "+" }, { source: "subs_paid", op: "+" },
+      { source: "recurring_paid", op: "+" }, { source: "cards_due", op: "+" },
+    ]},
+    netCash: { name: "My net cash", formula: [
+      { source: "income", op: "+" }, { source: "expenses", op: "-" }, { source: "total_paid", op: "-" },
+    ]},
+    loansTotal: { name: "My loans total", formula: [{ source: "loans_total", op: "+" }] },
+    subsTotal: { name: "My subs total", formula: [{ source: "subs_total", op: "+" }] },
+    recurringTotal: { name: "My recurring total", formula: [{ source: "recurring_total", op: "+" }] },
+    cardsDue: { name: "My cards due", formula: [{ source: "cards_due", op: "+" }] },
+    loansRem: { name: "My loans remaining", formula: [{ source: "loans_remaining", op: "+" }] },
+    subsRem: { name: "My subs remaining", formula: [{ source: "subs_remaining", op: "+" }] },
+    recurringRem: { name: "My recurring remaining", formula: [{ source: "recurring_remaining", op: "+" }] },
+  };
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
