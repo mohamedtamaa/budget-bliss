@@ -254,7 +254,7 @@ export default function DashboardPage() {
 
       {/* === GROUP 3: Remaining === */}
       <section>
-        <h3 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">Remaining To Pay</h3>
+        <h3 className="text-sm font-bold mb-3 flex items-center gap-2 text-foreground"><span className="w-1 h-4 rounded bg-destructive" /> Remaining To Pay</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4">
           <RemainingCard
             icon={Landmark}
