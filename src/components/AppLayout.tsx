@@ -1,8 +1,9 @@
 import { ReactNode, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   LayoutDashboard, Receipt, Repeat, Landmark,
-  Wallet, CreditCard, Settings, Menu, X, LogOut, Bell, BellOff, Tv, Sparkles
+  Wallet, CreditCard, Settings, Menu, X, LogOut, Bell, BellOff, Tv, Sparkles, Languages
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,17 +12,20 @@ import { useLoans } from "@/hooks/useFinanceData";
 import { checkLoanReminders, requestNotificationPermission } from "@/lib/notifications";
 import { toast } from "sonner";
 
-const navItems = [
-  { to: "/", icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/transactions", icon: Receipt, label: "Transactions" },
-  { to: "/recurring", icon: Repeat, label: "Recurring" },
-  { to: "/subscriptions", icon: Tv, label: "Subscriptions" },
-  { to: "/loans", icon: Landmark, label: "Loans" },
-  { to: "/cards", icon: CreditCard, label: "Credit Cards" },
-  { to: "/accounts", icon: Wallet, label: "Accounts" },
-  { to: "/insights", icon: Sparkles, label: "AI Insights" },
-  { to: "/settings", icon: Settings, label: "Settings" },
-];
+const useNavItems = () => {
+  const { t } = useTranslation();
+  return [
+    { to: "/", icon: LayoutDashboard, label: t("nav.dashboard") },
+    { to: "/transactions", icon: Receipt, label: t("nav.transactions") },
+    { to: "/recurring", icon: Repeat, label: t("nav.recurring") },
+    { to: "/subscriptions", icon: Tv, label: t("nav.subscriptions") },
+    { to: "/loans", icon: Landmark, label: t("nav.loans") },
+    { to: "/cards", icon: CreditCard, label: t("nav.cards") },
+    { to: "/accounts", icon: Wallet, label: t("nav.accounts") },
+    { to: "/insights", icon: Sparkles, label: t("nav.insights") },
+    { to: "/settings", icon: Settings, label: t("nav.settings") },
+  ];
+};
 
 const bottomNav = navItems.slice(0, 5);
 
