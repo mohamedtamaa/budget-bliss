@@ -1,8 +1,9 @@
 import { ReactNode, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   LayoutDashboard, Receipt, Repeat, Landmark,
-  Wallet, CreditCard, Settings, Menu, X, LogOut, Bell, BellOff, Tv, Sparkles
+  Wallet, CreditCard, Settings, Menu, X, LogOut, Bell, BellOff, Tv, Sparkles, Languages
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,21 +12,25 @@ import { useLoans } from "@/hooks/useFinanceData";
 import { checkLoanReminders, requestNotificationPermission } from "@/lib/notifications";
 import { toast } from "sonner";
 
-const navItems = [
-  { to: "/", icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/transactions", icon: Receipt, label: "Transactions" },
-  { to: "/recurring", icon: Repeat, label: "Recurring" },
-  { to: "/subscriptions", icon: Tv, label: "Subscriptions" },
-  { to: "/loans", icon: Landmark, label: "Loans" },
-  { to: "/cards", icon: CreditCard, label: "Credit Cards" },
-  { to: "/accounts", icon: Wallet, label: "Accounts" },
-  { to: "/insights", icon: Sparkles, label: "AI Insights" },
-  { to: "/settings", icon: Settings, label: "Settings" },
-];
-
-const bottomNav = navItems.slice(0, 5);
+const useNavItems = () => {
+  const { t } = useTranslation();
+  return [
+    { to: "/", icon: LayoutDashboard, label: t("nav.dashboard") },
+    { to: "/transactions", icon: Receipt, label: t("nav.transactions") },
+    { to: "/recurring", icon: Repeat, label: t("nav.recurring") },
+    { to: "/subscriptions", icon: Tv, label: t("nav.subscriptions") },
+    { to: "/loans", icon: Landmark, label: t("nav.loans") },
+    { to: "/cards", icon: CreditCard, label: t("nav.cards") },
+    { to: "/accounts", icon: Wallet, label: t("nav.accounts") },
+    { to: "/insights", icon: Sparkles, label: t("nav.insights") },
+    { to: "/settings", icon: Settings, label: t("nav.settings") },
+  ];
+};
 
 export function AppLayout({ children }: { children: ReactNode }) {
+  const { i18n } = useTranslation();
+  const navItems = useNavItems();
+  const bottomNav = navItems.slice(0, 5);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -112,6 +117,16 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <h1 className="text-lg font-semibold truncate flex-1">
             {navItems.find((n) => n.to === location.pathname)?.label || "Money Manager"}
           </h1>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => i18n.changeLanguage(i18n.language === "ar" ? "en" : "ar")}
+            className="gap-1 px-2"
+            title="Toggle language"
+          >
+            <Languages size={16} />
+            <span className="text-xs font-semibold">{i18n.language === "ar" ? "EN" : "ع"}</span>
+          </Button>
           <Button variant="ghost" size="icon" onClick={enableNotif} title={notifPerm === "granted" ? "Notifications on" : "Enable notifications"}>
             {notifPerm === "granted" ? <Bell size={18} className="text-primary" /> : <BellOff size={18} />}
           </Button>

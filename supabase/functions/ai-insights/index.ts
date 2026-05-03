@@ -32,9 +32,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { period = "monthly", question } = await req.json().catch(() => ({}));
+    const { period = "monthly", question, lang = "en" } = await req.json().catch(() => ({}));
 
-    // Fetch data
     const now = new Date();
     let since = new Date();
     if (period === "daily") since.setDate(now.getDate() - 1);
@@ -42,11 +41,10 @@ Deno.serve(async (req) => {
     else since.setMonth(now.getMonth() - 1);
     const sinceStr = since.toISOString().slice(0, 10);
 
-    const [tx, recs, loans, subs, accs, cats] = await Promise.all([
+    const [tx, recs, loans, accs, cats] = await Promise.all([
       supabase.from("transactions").select("*").gte("date", sinceStr),
       supabase.from("recurring_items").select("*").eq("active", true),
       supabase.from("loans").select("*").eq("active", true),
-      supabase.from("recurring_items").select("*").eq("type", "subscription"),
       supabase.from("accounts").select("*"),
       supabase.from("categories").select("*"),
     ]);
@@ -60,53 +58,71 @@ Deno.serve(async (req) => {
       amount: Number(t.amount),
       category: catMap.get(t.category_id) || "Uncategorized",
       account: accMap.get(t.account_id)?.name || "—",
-      description: t.description,
+      isCard: accMap.get(t.account_id)?.type === "credit_card",
     }));
 
     const totalIncome = transactions.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
-    const totalExpense = transactions.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+    const totalExpense = transactions.filter((t) => t.type === "expense" && !t.isCard).reduce((s, t) => s + t.amount, 0);
 
     const byCategory: Record<string, number> = {};
     transactions.filter((t) => t.type === "expense").forEach((t) => {
       byCategory[t.category] = (byCategory[t.category] || 0) + t.amount;
     });
 
+    // Daily series
+    const byDay: Record<string, { income: number; expense: number }> = {};
+    transactions.forEach((t) => {
+      const d = t.date;
+      if (!byDay[d]) byDay[d] = { income: 0, expense: 0 };
+      if (t.type === "income") byDay[d].income += t.amount;
+      else if (t.type === "expense") byDay[d].expense += t.amount;
+    });
+    const series = Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, v]) => ({ date, ...v }));
+
     const summary = {
-      period,
-      since: sinceStr,
+      period, since: sinceStr,
       totals: { income: totalIncome, expense: totalExpense, net: totalIncome - totalExpense },
       expensesByCategory: byCategory,
       transactionsCount: transactions.length,
-      topExpenses: [...transactions].filter(t => t.type === "expense").sort((a, b) => b.amount - a.amount).slice(0, 10),
+      topExpenses: [...transactions].filter(t => t.type === "expense")
+        .sort((a, b) => b.amount - a.amount).slice(0, 5)
+        .map(t => ({ category: t.category, amount: t.amount })),
       recurring: (recs.data || []).map((r: any) => ({ name: r.name, type: r.type, amount: Number(r.amount) })),
-      loans: (loans.data || []).map((l: any) => ({ name: l.name, monthly: Number(l.monthly_amount), remaining_balance: l.remaining_balance })),
+      loans: (loans.data || []).map((l: any) => ({ name: l.name, monthly: Number(l.monthly_amount) })),
     };
 
-    const systemPrompt = `You are a personal finance advisor. Analyze the user's data and give clear, actionable, friendly advice.
-Focus on:
-1. Spending patterns and where money is leaking
-2. Specific items the user should consider stopping or reducing (name them)
-3. Concrete ways to save money
-4. Ideas to earn more income based on their profile
-5. Warnings about loans, subscriptions, or recurring costs
-Use markdown with short sections, bullet points, and emojis. Be specific, not generic. Use the user's currency (assume EGP).`;
+    const langInstruction = lang === "ar"
+      ? "Reply in Arabic (العربية). Use Arabic for all text including action items."
+      : "Reply in English.";
+
+    const systemPrompt = `You are a concise personal finance advisor. ${langInstruction}
+Return ONLY valid JSON matching this exact schema (no markdown, no code fences):
+{
+  "summary": "2-3 short sentences max",
+  "actions": [
+    { "title": "short title", "detail": "one sentence why", "impact": "high|medium|low" }
+  ],
+  "stop_spending": ["item name 1", "item name 2"],
+  "save_tips": ["tip 1", "tip 2"],
+  "earn_tips": ["tip 1", "tip 2"]
+}
+Rules: max 5 actions, max 4 items per list, each string under 120 chars. Be specific to their data. Currency is EGP.`;
 
     const userPrompt = question
-      ? `${question}\n\nMy financial data (${period} period since ${sinceStr}):\n${JSON.stringify(summary, null, 2)}`
-      : `Analyze my ${period} financial data and give me recommendations:\n${JSON.stringify(summary, null, 2)}`;
+      ? `${question}\n\nData:\n${JSON.stringify(summary)}`
+      : `Analyze this ${period} data:\n${JSON.stringify(summary)}`;
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
+        response_format: { type: "json_object" },
       }),
     });
 
@@ -117,7 +133,7 @@ Use markdown with short sections, bullet points, and emojis. Be specific, not ge
         });
       }
       if (aiRes.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Add credits in workspace settings." }), {
+        return new Response(JSON.stringify({ error: "AI credits exhausted." }), {
           status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -126,9 +142,17 @@ Use markdown with short sections, bullet points, and emojis. Be specific, not ge
     }
 
     const data = await aiRes.json();
-    const insights = data.choices?.[0]?.message?.content || "No insights generated.";
+    const content = data.choices?.[0]?.message?.content || "{}";
+    let insights;
+    try { insights = JSON.parse(content); } catch { insights = { summary: content, actions: [], stop_spending: [], save_tips: [], earn_tips: [] }; }
 
-    return new Response(JSON.stringify({ insights, summary }), {
+    const charts = {
+      categories: Object.entries(byCategory).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 6),
+      series,
+      totals: summary.totals,
+    };
+
+    return new Response(JSON.stringify({ insights, charts }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
