@@ -19,6 +19,7 @@ const navItems = [
   { to: "/loans", icon: Landmark, label: "Loans" },
   { to: "/cards", icon: CreditCard, label: "Credit Cards" },
   { to: "/accounts", icon: Wallet, label: "Accounts" },
+  { to: "/insights", icon: Sparkles, label: "AI Insights" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
 
