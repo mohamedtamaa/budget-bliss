@@ -18,6 +18,7 @@ import AccountsPage from "@/pages/AccountsPage";
 import SettingsPage from "@/pages/SettingsPage";
 import GuidePage from "@/pages/GuidePage";
 import QuickAddPage from "@/pages/QuickAddPage";
+import AIInsightsPage from "@/pages/AIInsightsPage";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient({
