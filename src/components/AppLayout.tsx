@@ -27,9 +27,10 @@ const useNavItems = () => {
   ];
 };
 
-const bottomNav = navItems.slice(0, 5);
-
 export function AppLayout({ children }: { children: ReactNode }) {
+  const { i18n } = useTranslation();
+  const navItems = useNavItems();
+  const bottomNav = navItems.slice(0, 5);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
