@@ -2,7 +2,7 @@ import { ReactNode, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Receipt, Repeat, Landmark,
-  Wallet, CreditCard, Settings, Menu, X, LogOut, Bell, BellOff, Tv
+  Wallet, CreditCard, Settings, Menu, X, LogOut, Bell, BellOff, Tv, Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
