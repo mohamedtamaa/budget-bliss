@@ -2,7 +2,7 @@ import { ReactNode, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Receipt, Repeat, Landmark,
-  Wallet, CreditCard, Settings, Menu, X, LogOut, Bell, BellOff, Tv
+  Wallet, CreditCard, Settings, Menu, X, LogOut, Bell, BellOff, Tv, Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +19,7 @@ const navItems = [
   { to: "/loans", icon: Landmark, label: "Loans" },
   { to: "/cards", icon: CreditCard, label: "Credit Cards" },
   { to: "/accounts", icon: Wallet, label: "Accounts" },
+  { to: "/insights", icon: Sparkles, label: "AI Insights" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
 

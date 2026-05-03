@@ -18,6 +18,7 @@ import AccountsPage from "@/pages/AccountsPage";
 import SettingsPage from "@/pages/SettingsPage";
 import GuidePage from "@/pages/GuidePage";
 import QuickAddPage from "@/pages/QuickAddPage";
+import AIInsightsPage from "@/pages/AIInsightsPage";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient({
@@ -37,6 +38,7 @@ const Shell = () => (
         <Route path="/accounts" element={<AccountsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/guide" element={<GuidePage />} />
+        <Route path="/insights" element={<AIInsightsPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppLayout>
