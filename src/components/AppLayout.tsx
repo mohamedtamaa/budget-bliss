@@ -117,6 +117,16 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <h1 className="text-lg font-semibold truncate flex-1">
             {navItems.find((n) => n.to === location.pathname)?.label || "Money Manager"}
           </h1>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => i18n.changeLanguage(i18n.language === "ar" ? "en" : "ar")}
+            className="gap-1 px-2"
+            title="Toggle language"
+          >
+            <Languages size={16} />
+            <span className="text-xs font-semibold">{i18n.language === "ar" ? "EN" : "ع"}</span>
+          </Button>
           <Button variant="ghost" size="icon" onClick={enableNotif} title={notifPerm === "granted" ? "Notifications on" : "Enable notifications"}>
             {notifPerm === "granted" ? <Bell size={18} className="text-primary" /> : <BellOff size={18} />}
           </Button>
